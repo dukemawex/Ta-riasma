@@ -4,6 +4,9 @@ async function loadJson(path) {
   return await res.json();
 }
 
+const MULTI_HEALTH_GAP_THRESHOLD = 0.2;
+const DUP_QUALITY_F1_THRESHOLD = 0.8;
+
 function kpi(label, value) {
   const d = document.createElement('div');
   d.className = 'kpi';
@@ -39,7 +42,10 @@ function drawLineChart(canvasId, labels, datasets) {
     ctx.stroke();
   }
 
-  const xFor = (i) => pad.left + ((w - pad.left - pad.right) * i) / Math.max(labels.length - 1, 1);
+  const xFor = (i) => {
+    if (labels.length === 1) return (pad.left + (w - pad.right)) / 2;
+    return pad.left + ((w - pad.left - pad.right) * i) / (labels.length - 1);
+  };
   const yFor = (v) => h - pad.bottom - ((v - min) / range) * (h - pad.top - pad.bottom);
 
   datasets.forEach((ds) => {
@@ -74,8 +80,9 @@ function drawBarChart(canvasId, items) {
   const max = Math.max(...items.map((i) => i.value), 1);
   const chartW = w - pad.left - pad.right;
   const chartH = h - pad.top - pad.bottom;
-  const barW = chartW / items.length * 0.64;
-  const gap = chartW / items.length * 0.36;
+  const safeCount = Math.max(items.length, 1);
+  const barW = chartW / safeCount * 0.64;
+  const gap = chartW / safeCount * 0.36;
 
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = '#ffffff';
@@ -123,7 +130,7 @@ function drawBarChart(canvasId, items) {
         ]
       }]
     );
-    const health = Number(m.separation_gap ?? 0) >= 0.2 ? 'good' : 'risk';
+    const health = Number(m.separation_gap ?? 0) >= MULTI_HEALTH_GAP_THRESHOLD ? 'good' : 'risk';
     document.getElementById('multi-insight').innerHTML = `Multilingual stability signal is <b class="${health}">${health === 'good' ? 'strong' : 'weak'}</b> based on current separation gap.`;
     multiStatus.textContent = 'Loaded multilingual results successfully.';
   } catch (e) {
@@ -175,7 +182,7 @@ function drawBarChart(canvasId, items) {
         color: ['#2563eb', '#16a34a', '#9333ea', '#ea580c'][idx % 4]
       }))
     );
-    const qualityClass = Number(rec.combined_f1 ?? 0) >= 0.8 ? 'good' : 'risk';
+    const qualityClass = Number(rec.combined_f1 ?? 0) >= DUP_QUALITY_F1_THRESHOLD ? 'good' : 'risk';
     document.getElementById('dup-insight').innerHTML = `Duplicate stack fit is <b class="${qualityClass}">${qualityClass === 'good' ? 'production-ready' : 'needs tuning'}</b> at current threshold.`;
 
     dupStatus.textContent = 'Loaded duplicate evaluation results successfully.';
@@ -185,10 +192,11 @@ function drawBarChart(canvasId, items) {
 
   const m = (multiData && multiData.metrics) || {};
   const r = (dupData && dupData.recommended_threshold) || {};
-  summary.appendChild(kpi('Product Trust Score', ((Number(m.separation_gap ?? 0) * 100).toFixed(1)) + '%'));
+  const loadedSignals = Number(Boolean(multiData)) + Number(Boolean(dupData));
+  summary.appendChild(kpi('Separation Gap %', ((Number(m.separation_gap ?? 0) * 100).toFixed(1)) + '%'));
   summary.appendChild(kpi('Duplicate Ops F1', (Number(r.combined_f1 ?? 0)).toFixed(4)));
   summary.appendChild(kpi('Recommended Threshold', (Number(r.threshold ?? 0)).toFixed(2)));
-  summary.appendChild(kpi('Pipeline Health', multiData && dupData ? 'All signals loaded' : 'Partial signals'));
+  summary.appendChild(kpi('Data Coverage', `${((loadedSignals / 2) * 100).toFixed(0)}%`));
   summaryStatus.textContent = multiData && dupData
     ? 'Executive summary generated from multilingual + duplicate evaluations.'
     : 'Summary loaded with available data only; run both evaluations for complete analytics.';
