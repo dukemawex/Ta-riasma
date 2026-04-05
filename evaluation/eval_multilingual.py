@@ -117,7 +117,7 @@ class EmbeddingClient:
                     return values
                 nested_embedding = candidate.get("embedding")
                 if EmbeddingClient._is_numeric_vector(nested_embedding):
-                    return candidate["embedding"]
+                    return nested_embedding
             elif EmbeddingClient._is_numeric_vector(candidate):
                 return candidate
             else:
