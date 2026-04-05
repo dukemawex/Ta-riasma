@@ -35,12 +35,15 @@ jobs:
       - name: Validate required secrets
         run: |
           missing=0
-          for key in ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY GEMINI_API_KEY; do
+          for key in ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY; do
             if [ -z "${!key}" ]; then
               echo "$key is not set. Add it in Settings > Secrets and variables > Actions."
               missing=1
             fi
           done
+          if [ -z "${GEMINI_API_KEY}" ]; then
+            echo "GEMINI_API_KEY is not set; embeddings will route via AgentRouter OpenAI endpoint using ANTHROPIC_API_KEY."
+          fi
           if [ "$missing" -ne 0 ]; then exit 1; fi
 
       - name: Install dependencies

@@ -125,9 +125,9 @@ class EvaluationClient:
                 max_tokens=1200,
             )
             text_content = ""
-            for block in getattr(resp, "content", []):
-                if getattr(block, "type", None) == "text":
-                    text_content += getattr(block, "text", "")
+            for block in resp.content:
+                if block.type == "text":
+                    text_content += block.text
             if not text_content:
                 raise RuntimeError(f"Unexpected Anthropic response shape: {resp}")
             return parse_json_block(text_content)
