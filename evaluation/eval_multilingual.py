@@ -98,6 +98,14 @@ class EmbeddingClient:
         raise RuntimeError("Retry loop exhausted unexpectedly")
 
     @staticmethod
+    def _is_numeric_vector(candidate) -> bool:
+        return (
+            isinstance(candidate, list)
+            and len(candidate) > 0
+            and all(isinstance(x, (int, float)) for x in candidate)
+        )
+
+    @staticmethod
     def _extract_gemini_embedding(resp) -> List[float]:
         if resp is None:
             raise RuntimeError("Gemini embedding response was empty")
@@ -467,10 +475,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-    @staticmethod
-    def _is_numeric_vector(candidate) -> bool:
-        return (
-            isinstance(candidate, list)
-            and len(candidate) > 0
-            and all(isinstance(x, (int, float)) for x in candidate)
-        )
