@@ -16,6 +16,8 @@ on:
 jobs:
   run-evaluation:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       AGENTROUTER_API_KEY: ${{ secrets.AGENTROUTER_API_KEY }}
       AGENTROUTER_BASE_URL: ${{ vars.AGENTROUTER_BASE_URL }}
@@ -52,6 +54,6 @@ jobs:
       - name: Upload evaluation artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: evaluation-results-${{ github.run_number }}
+          name: evaluation-results-${{ github.run_id }}
           path: evaluation/results/
           if-no-files-found: error
