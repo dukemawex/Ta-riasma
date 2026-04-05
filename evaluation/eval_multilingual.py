@@ -17,7 +17,7 @@ CACHE_PATH = RESULTS_DIR / "embedding_cache.json"
 RESULT_JSON_PATH = RESULTS_DIR / "multilingual_results.json"
 REPORT_MD_PATH = RESULTS_DIR / "multilingual_report.md"
 
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-002")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-004")
 MAX_RETRIES = 5
 INITIAL_BACKOFF = 2
 FALLBACK_OPENAI_BASE_URL = "https://agentrouter.org/v1"
@@ -40,19 +40,18 @@ class EmbeddingClient:
         gemini_key = (os.getenv("GEMINI_API_KEY") or "").strip()
         if gemini_key:
             try:
-                import google.generativeai as genai  # type: ignore
+                from google import genai  # type: ignore
 
-                genai.configure(api_key=gemini_key)
-                self._gemini_client = genai
+                self._gemini_client = genai.Client(api_key=gemini_key)
                 self._mode = "gemini"
                 return
             except Exception as exc:
-                print(f"Falling back from google-generativeai SDK: {exc}")
+                print(f"Falling back from google-genai SDK: {exc}")
 
         agentrouter_bearer_token = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
         if not agentrouter_bearer_token:
             raise RuntimeError(
-                "Set GEMINI_API_KEY for direct Gemini embeddings, or set ANTHROPIC_API_KEY (and install openai SDK) to route embeddings via AgentRouter OpenAI endpoint."
+                "Set GEMINI_API_KEY for direct Gemini embeddings (google-genai SDK), or set ANTHROPIC_API_KEY (and install openai SDK) to route embeddings via AgentRouter OpenAI endpoint."
             )
         anthropic_base_url = (os.getenv("ANTHROPIC_BASE_URL") or "").strip()
         if anthropic_base_url:
@@ -76,25 +75,73 @@ class EmbeddingClient:
                 return fn()
             except Exception as exc:
                 msg = str(exc).lower()
-                is_rate_limited = "429" in msg or "rate" in msg
-                if not is_rate_limited or attempt == MAX_RETRIES:
+                is_retryable = (
+                    "429" in msg
+                    or "rate" in msg
+                    or "timed out" in msg
+                    or "timeout" in msg
+                    or "connection" in msg
+                    or "dns" in msg
+                    or "temporar" in msg
+                    or "503" in msg
+                    or "502" in msg
+                    or "504" in msg
+                )
+                if not is_retryable or attempt == MAX_RETRIES:
                     raise
-                print(f"Rate limit detected, retrying in {backoff}s (attempt {attempt}/{MAX_RETRIES})")
+                print(f"Transient embedding error, retrying in {backoff}s (attempt {attempt}/{MAX_RETRIES})")
                 time.sleep(backoff)
                 backoff *= 2
         raise RuntimeError("Retry loop exhausted unexpectedly")
 
+    @staticmethod
+    def _extract_gemini_embedding(resp) -> List[float]:
+        if resp is None:
+            raise RuntimeError("Gemini embedding response was empty")
+
+        emb = getattr(resp, "embedding", None)
+        if isinstance(emb, dict):
+            values = emb.get("values")
+            if isinstance(values, list) and values:
+                return values
+        elif isinstance(emb, list) and emb:
+            return emb
+
+        embeddings = getattr(resp, "embeddings", None)
+        if isinstance(embeddings, list) and embeddings:
+            first = embeddings[0]
+            values = getattr(first, "values", None)
+            if isinstance(values, list) and values:
+                return values
+            if isinstance(first, dict):
+                dict_values = first.get("values")
+                if isinstance(dict_values, list) and dict_values:
+                    return dict_values
+
+        if isinstance(resp, dict):
+            dict_emb = resp.get("embedding")
+            if isinstance(dict_emb, dict):
+                values = dict_emb.get("values")
+                if isinstance(values, list) and values:
+                    return values
+            elif isinstance(dict_emb, list) and dict_emb:
+                return dict_emb
+
+            dict_embs = resp.get("embeddings")
+            if isinstance(dict_embs, list) and dict_embs:
+                first = dict_embs[0]
+                if isinstance(first, dict):
+                    values = first.get("values")
+                    if isinstance(values, list) and values:
+                        return values
+
+        raise RuntimeError(f"Unexpected Gemini embedding response shape: {resp}")
+
     def get_embedding(self, text: str, model: str) -> List[float]:
         def call():
             if self._gemini_client is not None:
-                resp = self._gemini_client.embed_content(model=model, content=text)
-                try:
-                    emb = resp["embedding"]
-                except (KeyError, TypeError):
-                    emb = getattr(resp, "embedding", None)
-                if emb:
-                    return emb
-                raise RuntimeError(f"Unexpected Gemini embedding response shape: {resp}")
+                resp = self._gemini_client.models.embed_content(model=model, contents=text)
+                return self._extract_gemini_embedding(resp)
 
             if self._openai_client is not None:
                 resp = self._openai_client.embeddings.create(model=model, input=text)
