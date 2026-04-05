@@ -1,0 +1,57 @@
+name: Evaluation Suite
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Which evaluation to run"
+        required: true
+        default: both
+        type: choice
+        options:
+          - multilingual
+          - duplicate
+          - both
+
+jobs:
+  run-evaluation:
+    runs-on: ubuntu-latest
+    env:
+      AGENTROUTER_API_KEY: ${{ secrets.AGENTROUTER_API_KEY }}
+      AGENTROUTER_BASE_URL: ${{ vars.AGENTROUTER_BASE_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate required secret
+        run: |
+          if [ -z "${AGENTROUTER_API_KEY}" ]; then
+            echo "AGENTROUTER_API_KEY is not set. Add it in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        working-directory: evaluation
+        run: pip install -r requirements.txt
+
+      - name: Run multilingual evaluation
+        if: ${{ github.event.inputs.target == 'multilingual' || github.event.inputs.target == 'both' }}
+        working-directory: evaluation
+        run: python eval_multilingual.py
+
+      - name: Run duplicate evaluation
+        if: ${{ github.event.inputs.target == 'duplicate' || github.event.inputs.target == 'both' }}
+        working-directory: evaluation
+        run: python eval_duplicates.py
+
+      - name: Upload evaluation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-results-${{ github.run_number }}
+          path: evaluation/results/
+          if-no-files-found: error
