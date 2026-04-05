@@ -99,48 +99,58 @@ class EmbeddingClient:
         if resp is None:
             raise RuntimeError("Gemini embedding response was empty")
 
-        emb = getattr(resp, "embedding", None)
-        if isinstance(emb, dict):
-            values = emb.get("values")
-            if isinstance(values, list) and values:
-                return values
-        elif isinstance(emb, list) and emb:
-            return emb
-
-        embeddings = getattr(resp, "embeddings", None)
-        if isinstance(embeddings, list) and embeddings:
-            first = embeddings[0]
-            values = getattr(first, "values", None)
-            if isinstance(values, list) and values:
-                return values
-            if isinstance(first, dict):
-                dict_values = first.get("values")
-                if isinstance(dict_values, list) and dict_values:
-                    return dict_values
-
-        if isinstance(resp, dict):
-            dict_emb = resp.get("embedding")
-            if isinstance(dict_emb, dict):
-                values = dict_emb.get("values")
+        def from_embedding_obj(candidate):
+            if isinstance(candidate, dict):
+                values = candidate.get("values")
                 if isinstance(values, list) and values:
                     return values
-            elif isinstance(dict_emb, list) and dict_emb:
-                return dict_emb
+                if isinstance(candidate.get("embedding"), list) and candidate["embedding"]:
+                    return candidate["embedding"]
+            elif isinstance(candidate, list) and candidate:
+                return candidate
+            else:
+                values = getattr(candidate, "values", None)
+                if isinstance(values, list) and values:
+                    return values
+                nested = getattr(candidate, "embedding", None)
+                if isinstance(nested, list) and nested:
+                    return nested
+            return None
 
-            dict_embs = resp.get("embeddings")
-            if isinstance(dict_embs, list) and dict_embs:
-                first = dict_embs[0]
-                if isinstance(first, dict):
-                    values = first.get("values")
-                    if isinstance(values, list) and values:
-                        return values
+        direct = from_embedding_obj(getattr(resp, "embedding", None))
+        if direct:
+            return direct
+
+        for candidate in getattr(resp, "embeddings", None) or []:
+            extracted = from_embedding_obj(candidate)
+            if extracted:
+                return extracted
+
+        if isinstance(resp, dict):
+            direct = from_embedding_obj(resp.get("embedding"))
+            if direct:
+                return direct
+            for candidate in resp.get("embeddings", []) or []:
+                extracted = from_embedding_obj(candidate)
+                if extracted:
+                    return extracted
 
         raise RuntimeError(f"Unexpected Gemini embedding response shape: {resp}")
 
     def get_embedding(self, text: str, model: str) -> List[float]:
         def call():
             if self._gemini_client is not None:
-                resp = self._gemini_client.models.embed_content(model=model, contents=text)
+                try:
+                    resp = self._gemini_client.models.embed_content(model=model, contents=text)
+                except Exception as exc:
+                    msg = str(exc).lower()
+                    if ("404" in msg or "not found" in msg) and not model.startswith("models/"):
+                        resp = self._gemini_client.models.embed_content(
+                            model=f"models/{model}",
+                            contents=text,
+                        )
+                    else:
+                        raise
                 return self._extract_gemini_embedding(resp)
 
             if self._openai_client is not None:
