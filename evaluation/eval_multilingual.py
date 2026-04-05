@@ -4,13 +4,12 @@ import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 from scipy.spatial.distance import cosine
 from tabulate import tabulate
-from urllib import error, request
-from urllib.parse import urlparse
+from urllib import error
 
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
@@ -21,7 +20,7 @@ REPORT_MD_PATH = RESULTS_DIR / "multilingual_report.md"
 EMBEDDING_MODEL = "text-embedding-004"
 MAX_RETRIES = 5
 INITIAL_BACKOFF = 2
-DEFAULT_AGENTROUTER_BASE_URL = "https://api.agentrouter.ai/v1"
+AGENTROUTER_OPENAI_BASE_URL = "https://agentrouter.org/v1"
 
 
 @dataclass
@@ -32,46 +31,37 @@ class PairScore:
     label: str
 
 
-class AgentRouterClient:
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-        self.base_url = self._resolve_base_url(os.getenv("AGENTROUTER_BASE_URL"))
-        self._sdk_client = None
+class EmbeddingClient:
+    def __init__(self):
+        self._gemini_client = None
+        self._openai_client = None
+        self._mode = "unknown"
+
+        gemini_key = (os.getenv("GEMINI_API_KEY") or "").strip()
+        if gemini_key:
+            try:
+                import google.generativeai as genai  # type: ignore
+
+                genai.configure(api_key=gemini_key)
+                self._gemini_client = genai
+                self._mode = "gemini"
+                return
+            except Exception as exc:
+                print(f"Falling back from google-generativeai SDK: {exc}")
+
+        anthropic_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
+        if not anthropic_key:
+            raise RuntimeError(
+                "Set GEMINI_API_KEY for direct Gemini embeddings, or set ANTHROPIC_API_KEY to route embeddings via AgentRouter OpenAI endpoint."
+            )
         try:
-            from agentrouter import AgentRouter  # type: ignore
-
-            self._sdk_client = AgentRouter(api_key=api_key)
-        except Exception:
-            self._sdk_client = None
-
-    @staticmethod
-    def _resolve_base_url(raw_base_url: Optional[str]) -> str:
-        candidate = (raw_base_url or "").strip().rstrip("/")
-        if not candidate:
-            return DEFAULT_AGENTROUTER_BASE_URL
-
-        parsed = urlparse(candidate)
-        if parsed.scheme in {"http", "https"} and parsed.netloc:
-            return candidate
-
-        print(
-            f"Invalid AGENTROUTER_BASE_URL '{raw_base_url}'. "
-            f"Falling back to {DEFAULT_AGENTROUTER_BASE_URL}."
-        )
-        return DEFAULT_AGENTROUTER_BASE_URL
-
-    def _http_post(self, endpoint: str, payload: dict) -> dict:
-        req = request.Request(
-            f"{self.base_url}/{endpoint.lstrip('/')}",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-        with request.urlopen(req, timeout=60) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            from openai import OpenAI  # type: ignore
+        except Exception as exc:
+            raise RuntimeError(
+                "openai SDK is required for AgentRouter-routed embeddings when GEMINI_API_KEY is not set."
+            ) from exc
+        self._openai_client = OpenAI(api_key=anthropic_key, base_url=AGENTROUTER_OPENAI_BASE_URL)
+        self._mode = "agentrouter-openai"
 
     def _with_backoff(self, fn):
         backoff = INITIAL_BACKOFF
@@ -90,31 +80,20 @@ class AgentRouterClient:
 
     def get_embedding(self, text: str, model: str) -> List[float]:
         def call():
-            if self._sdk_client is not None:
-                if hasattr(self._sdk_client, "embeddings") and hasattr(self._sdk_client.embeddings, "create"):
-                    resp = self._sdk_client.embeddings.create(model=model, input=text)
-                    data = getattr(resp, "data", None) or resp.get("data", [])
-                    if data:
-                        first = data[0]
-                        emb = getattr(first, "embedding", None) or first.get("embedding")
-                        if emb:
-                            return emb
-                if hasattr(self._sdk_client, "responses") and hasattr(self._sdk_client.responses, "create"):
-                    resp = self._sdk_client.responses.create(model=model, input=text)
-                    output = getattr(resp, "output", None) or resp.get("output", [])
-                    for item in output:
-                        content = getattr(item, "content", None) or item.get("content", [])
-                        for part in content:
-                            emb = getattr(part, "embedding", None) or part.get("embedding")
-                            if emb:
-                                return emb
+            if self._mode == "gemini" and self._gemini_client is not None:
+                resp = self._gemini_client.embed_content(model=model, content=text)
+                emb = resp.get("embedding")
+                if emb:
+                    return emb
+                raise RuntimeError(f"Unexpected Gemini embedding response shape: {resp}")
 
-            data = self._http_post("embeddings", {"model": model, "input": text})
-            if "data" in data and data["data"]:
-                return data["data"][0]["embedding"]
-            if "embedding" in data:
-                return data["embedding"]
-            raise RuntimeError(f"Unexpected embedding response shape: {data}")
+            if self._openai_client is not None:
+                resp = self._openai_client.embeddings.create(model=model, input=text)
+                if resp.data:
+                    return resp.data[0].embedding
+                raise RuntimeError("OpenAI-compatible embedding response contained no vectors")
+
+            raise RuntimeError("Embedding client is not configured")
 
         return self._with_backoff(call)
 
@@ -225,10 +204,6 @@ def key_for(proposal_id: int, language: str) -> str:
 
 
 def main() -> None:
-    api_key = os.getenv("AGENTROUTER_API_KEY")
-    if not api_key:
-        raise RuntimeError("AGENTROUTER_API_KEY is required")
-
     np.random.seed(42)
 
     proposals = get_proposals()
@@ -237,7 +212,7 @@ def main() -> None:
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     cache = load_cache(CACHE_PATH)
-    client = AgentRouterClient(api_key=api_key)
+    client = EmbeddingClient()
 
     embeddings: Dict[Tuple[int, str], List[float]] = {}
 
@@ -264,7 +239,7 @@ def main() -> None:
         raise RuntimeError(
             "Insufficient embeddings for multilingual evaluation. "
             f"Loaded {loaded_embeddings}/{total_required}. "
-            "Check network/DNS access to AgentRouter and AGENTROUTER_BASE_URL/API key configuration."
+            "Check network/DNS access and GEMINI_API_KEY or ANTHROPIC_API_KEY configuration."
         )
 
     positive_scores: List[PairScore] = []

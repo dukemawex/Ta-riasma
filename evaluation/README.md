@@ -5,7 +5,7 @@ This directory provides standalone, reproducible evaluation scripts for robustne
 - **Item 4:** cross-lingual semantic stability of Gemini embeddings
 - **Item 5:** cosine-based duplicate detection performance and threshold selection
 
-All model calls route through **AgentRouter**.
+Claude calls use the standard **Anthropic SDK**. Gemini embeddings can run either directly via Gemini SDK or via AgentRouter's OpenAI-compatible endpoint.
 
 ## Prerequisites
 
@@ -15,16 +15,13 @@ All model calls route through **AgentRouter**.
 pip install -r requirements.txt
 ```
 
-2. Set API key:
+2. Set environment variables:
 
 ```bash
-export AGENTROUTER_API_KEY="<your_key>"
-```
-
-Optional endpoint override:
-
-```bash
-export AGENTROUTER_BASE_URL="https://api.agentrouter.ai/v1"
+export ANTHROPIC_BASE_URL="https://agentrouter.org/"
+export ANTHROPIC_AUTH_TOKEN="sk-xxx"
+export ANTHROPIC_API_KEY="sk-xxx"
+export GEMINI_API_KEY="your_gemini_key"  # optional if using Gemini directly
 ```
 
 ## Run
@@ -90,10 +87,11 @@ You can run evaluations without local Python by using:
 ### One-time setup
 
 1. Go to **GitHub repo → Settings → Secrets and variables → Actions**.
-2. Add repository secret:
-   - `AGENTROUTER_API_KEY` = your AgentRouter API key
-3. (Optional) Add repository variable:
-   - `AGENTROUTER_BASE_URL` = `https://api.agentrouter.ai/v1`
+2. Add repository secrets:
+   - `ANTHROPIC_BASE_URL` = `https://agentrouter.org/`
+   - `ANTHROPIC_AUTH_TOKEN` = your token (`sk-xxx`)
+   - `ANTHROPIC_API_KEY` = your token (`sk-xxx`)
+   - `GEMINI_API_KEY` = your Gemini key (if using Gemini directly)
 
 ### Run it (mobile-friendly)
 
