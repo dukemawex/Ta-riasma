@@ -20,7 +20,7 @@ pip install -r requirements.txt
 ```bash
 export ANTHROPIC_BASE_URL="https://agentrouter.org/"
 export ANTHROPIC_AUTH_TOKEN="sk-xxx"  # transport/auth token for AgentRouter-routed Anthropic calls
-export ANTHROPIC_API_KEY="sk-xxx"     # key used by Anthropic SDK; also used as bearer token for AgentRouter OpenAI-compatible Gemini embeddings
+export ANTHROPIC_API_KEY="sk-xxx"     # Anthropic SDK key and bearer token for AgentRouter OpenAI-compatible Gemini embeddings
 export GEMINI_API_KEY="your_gemini_key"  # optional if using Gemini directly
 ```
 
@@ -90,7 +90,7 @@ You can run evaluations without local Python by using:
 2. Add repository secrets:
    - `ANTHROPIC_BASE_URL` = `https://agentrouter.org/`
    - `ANTHROPIC_AUTH_TOKEN` = AgentRouter auth token (`sk-xxx`)
-   - `ANTHROPIC_API_KEY` = Anthropic SDK key (and AgentRouter OpenAI-compatible bearer token for embeddings) (`sk-xxx`)
+   - `ANTHROPIC_API_KEY` = Anthropic SDK key and AgentRouter OpenAI-compatible bearer token for embeddings (`sk-xxx`)
    - `GEMINI_API_KEY` = your Gemini key (if using Gemini directly)
 
 ### Run it (mobile-friendly)
