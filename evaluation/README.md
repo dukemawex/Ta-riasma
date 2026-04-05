@@ -5,7 +5,7 @@ This directory provides standalone, reproducible evaluation scripts for robustne
 - **Item 4:** cross-lingual semantic stability of Gemini embeddings
 - **Item 5:** cosine-based duplicate detection performance and threshold selection
 
-Claude calls use the standard **Anthropic SDK**. Gemini embeddings can run either directly via Gemini SDK or via AgentRouter's OpenAI-compatible endpoint.
+Claude calls use the standard **Anthropic SDK**. Gemini embeddings (default: `gemini-embedding-002`) can run either directly via Gemini SDK or via AgentRouter's OpenAI-compatible endpoint.
 
 ## Prerequisites
 

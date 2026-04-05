@@ -17,7 +17,7 @@ CACHE_PATH = RESULTS_DIR / "embedding_cache.json"
 RESULT_JSON_PATH = RESULTS_DIR / "multilingual_results.json"
 REPORT_MD_PATH = RESULTS_DIR / "multilingual_report.md"
 
-EMBEDDING_MODEL = "text-embedding-004"
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-002")
 MAX_RETRIES = 5
 INITIAL_BACKOFF = 2
 FALLBACK_OPENAI_BASE_URL = "https://agentrouter.org/v1"
