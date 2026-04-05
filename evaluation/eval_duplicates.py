@@ -18,7 +18,7 @@ EMBED_CACHE_PATH = RESULTS_DIR / "embedding_cache_dup.json"
 RESULT_JSON_PATH = RESULTS_DIR / "duplicate_results.json"
 REPORT_MD_PATH = RESULTS_DIR / "duplicate_report.md"
 
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-002")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
 PARAPHRASE_MODEL = "claude-sonnet-4-20250514"
 THRESHOLDS = [0.80, 0.85, 0.88, 0.90, 0.92, 0.95]
 MAX_RETRIES = 5
@@ -92,7 +92,7 @@ class EvaluationClient:
     def get_embedding(self, text: str, model: str) -> List[float]:
         def call():
             if self._gemini_client is not None:
-                resp = self._gemini_client.embed_content(model=model, content=text)
+                resp = self._gemini_client.embed_content(model="gemini-embedding-001", content=text)
                 try:
                     emb = resp["embedding"]
                 except (KeyError, TypeError):

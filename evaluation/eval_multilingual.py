@@ -14,7 +14,7 @@ CACHE_PATH = RESULTS_DIR / "embedding_cache.json"
 RESULT_JSON_PATH = RESULTS_DIR / "multilingual_results.json"
 REPORT_MD_PATH = RESULTS_DIR / "multilingual_report.md"
 
-DEFAULT_EMBEDDING_MODELS = ["text-embedding-004", "gemini-embedding-2"]
+DEFAULT_EMBEDDING_MODELS = ["gemini-embedding-001"]
 EMBEDDING_MODELS = [
     m.strip()
     for m in os.getenv("EMBEDDING_MODELS", ",".join(DEFAULT_EMBEDDING_MODELS)).split(",")
@@ -134,7 +134,9 @@ class EmbeddingClient:
     def _get_embedding_for_model(self, text: str, model: str) -> List[float]:
         def call():
             if self._gemini_client is not None:
-                resp = self._gemini_client.models.embed_content(model=model, contents=text)
+                resp = self._gemini_client.models.embed_content(
+                    model="gemini-embedding-001", contents=text
+                )
                 emb = self._extract_embedding(resp)
                 if emb:
                     return emb
