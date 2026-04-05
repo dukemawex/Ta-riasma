@@ -6,6 +6,11 @@ async function loadJson(path) {
 
 const MULTI_HEALTH_GAP_THRESHOLD = 0.2;
 const DUP_QUALITY_F1_THRESHOLD = 0.8;
+const LINE_LABEL_X_OFFSET = 18;
+const LINE_LABEL_Y_OFFSET = 10;
+const BAR_WIDTH_RATIO = 0.64;
+const BAR_GAP_RATIO = 0.36;
+const DISTRIBUTION_COLORS = ['#2563eb', '#16a34a', '#9333ea', '#ea580c'];
 
 function kpi(label, value) {
   const d = document.createElement('div');
@@ -65,7 +70,7 @@ function drawLineChart(canvasId, labels, datasets) {
   ctx.font = '12px Inter, sans-serif';
   labels.forEach((label, i) => {
     const x = xFor(i);
-    ctx.fillText(String(label), x - 18, h - 10);
+    ctx.fillText(String(label), x - LINE_LABEL_X_OFFSET, h - LINE_LABEL_Y_OFFSET);
   });
 }
 
@@ -81,8 +86,8 @@ function drawBarChart(canvasId, items) {
   const chartW = w - pad.left - pad.right;
   const chartH = h - pad.top - pad.bottom;
   const safeCount = Math.max(items.length, 1);
-  const barW = chartW / safeCount * 0.64;
-  const gap = chartW / safeCount * 0.36;
+  const barW = chartW / safeCount * BAR_WIDTH_RATIO;
+  const gap = chartW / safeCount * BAR_GAP_RATIO;
 
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = '#ffffff';
@@ -179,7 +184,7 @@ function drawBarChart(canvasId, items) {
       Object.entries(dist).map(([name, stats], idx) => ({
         label: name,
         value: Number(stats.mean ?? 0),
-        color: ['#2563eb', '#16a34a', '#9333ea', '#ea580c'][idx % 4]
+        color: DISTRIBUTION_COLORS[idx % DISTRIBUTION_COLORS.length]
       }))
     );
     const qualityClass = Number(rec.combined_f1 ?? 0) >= DUP_QUALITY_F1_THRESHOLD ? 'good' : 'risk';
