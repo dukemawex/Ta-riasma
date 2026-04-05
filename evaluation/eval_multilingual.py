@@ -89,7 +89,10 @@ class EmbeddingClient:
                 )
                 if not is_retryable or attempt == MAX_RETRIES:
                     raise
-                print(f"Transient embedding error, retrying in {backoff}s (attempt {attempt}/{MAX_RETRIES})")
+                print(
+                    "Transient error during embedding request, "
+                    f"retrying in {backoff}s (attempt {attempt}/{MAX_RETRIES}): {exc}"
+                )
                 time.sleep(backoff)
                 backoff *= 2
         raise RuntimeError("Retry loop exhausted unexpectedly")
@@ -102,18 +105,19 @@ class EmbeddingClient:
         def from_embedding_obj(candidate):
             if isinstance(candidate, dict):
                 values = candidate.get("values")
-                if isinstance(values, list) and values:
+                if EmbeddingClient._is_numeric_vector(values):
                     return values
-                if isinstance(candidate.get("embedding"), list) and candidate["embedding"]:
+                nested_embedding = candidate.get("embedding")
+                if EmbeddingClient._is_numeric_vector(nested_embedding):
                     return candidate["embedding"]
-            elif isinstance(candidate, list) and candidate:
+            elif EmbeddingClient._is_numeric_vector(candidate):
                 return candidate
             else:
                 values = getattr(candidate, "values", None)
-                if isinstance(values, list) and values:
+                if EmbeddingClient._is_numeric_vector(values):
                     return values
                 nested = getattr(candidate, "embedding", None)
-                if isinstance(nested, list) and nested:
+                if EmbeddingClient._is_numeric_vector(nested):
                     return nested
             return None
 
@@ -463,3 +467,10 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    @staticmethod
+    def _is_numeric_vector(candidate) -> bool:
+        return (
+            isinstance(candidate, list)
+            and len(candidate) > 0
+            and all(isinstance(x, (int, float)) for x in candidate)
+        )
