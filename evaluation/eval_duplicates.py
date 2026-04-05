@@ -591,10 +591,32 @@ def main() -> None:
     embed_cache = ensure_embeddings(pairs, client, embed_cache)
     add_scores(pairs, embed_cache)
 
+    required_text_ids = {p["base_id"] for p in pairs} | {p["variant_id"] for p in pairs}
+    available_text_ids = set(embed_cache.keys())
+    missing_ids = sorted(required_text_ids - available_text_ids)
+    if missing_ids:
+        sample = ", ".join(missing_ids[:10])
+        suffix = " ..." if len(missing_ids) > 10 else ""
+        raise RuntimeError(
+            "Insufficient embeddings for duplicate evaluation. "
+            f"Missing {len(missing_ids)} text embeddings (e.g., {sample}{suffix}). "
+            "Check network/DNS access to AgentRouter and AGENTROUTER_BASE_URL/API key configuration."
+        )
+
     negatives = [p for p in pairs if p["label"] == "not_duplicate"]
     rule_pos = [p for p in pairs if p["label"] == "duplicate" and p["type"] == "rule"]
     claude_pos = [p for p in pairs if p["label"] == "duplicate" and p["type"] == "claude"]
     combined_pos = [p for p in pairs if p["label"] == "duplicate"]
+
+    scored_negatives = [p for p in negatives if p.get("similarity_score") is not None]
+    scored_rule_pos = [p for p in rule_pos if p.get("similarity_score") is not None]
+    scored_claude_pos = [p for p in claude_pos if p.get("similarity_score") is not None]
+    if not scored_negatives or not scored_rule_pos or not scored_claude_pos:
+        raise RuntimeError(
+            "Insufficient scored pairs for duplicate metrics. "
+            f"rule={len(scored_rule_pos)}, claude={len(scored_claude_pos)}, negatives={len(scored_negatives)}. "
+            "Evaluation aborted to avoid misleading metrics."
+        )
 
     threshold_rows = []
     best = None
