@@ -18,7 +18,7 @@ EMBED_CACHE_PATH = RESULTS_DIR / "embedding_cache_dup.json"
 RESULT_JSON_PATH = RESULTS_DIR / "duplicate_results.json"
 REPORT_MD_PATH = RESULTS_DIR / "duplicate_report.md"
 
-EMBEDDING_MODEL = "text-embedding-004"
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-002")
 PARAPHRASE_MODEL = "claude-sonnet-4-20250514"
 THRESHOLDS = [0.80, 0.85, 0.88, 0.90, 0.92, 0.95]
 MAX_RETRIES = 5
