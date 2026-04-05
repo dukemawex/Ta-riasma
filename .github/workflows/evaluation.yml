@@ -48,7 +48,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: evaluation
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt anthropic google-generativeai openai
 
       - name: Run multilingual evaluation
         if: ${{ github.event.inputs.target == 'multilingual' || github.event.inputs.target == 'both' }}

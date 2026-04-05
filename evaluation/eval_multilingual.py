@@ -20,7 +20,7 @@ REPORT_MD_PATH = RESULTS_DIR / "multilingual_report.md"
 EMBEDDING_MODEL = "text-embedding-004"
 MAX_RETRIES = 5
 INITIAL_BACKOFF = 2
-AGENTROUTER_OPENAI_BASE_URL = "https://agentrouter.org/v1"
+FALLBACK_OPENAI_BASE_URL = "https://agentrouter.org/v1"
 
 
 @dataclass
@@ -49,20 +49,17 @@ class EmbeddingClient:
             except Exception as exc:
                 print(f"Falling back from google-generativeai SDK: {exc}")
 
-        agentrouter_bearer_token = (
-            (os.getenv("ANTHROPIC_API_KEY") or "").strip()
-            or (os.getenv("ANTHROPIC_AUTH_TOKEN") or "").strip()
-        )
+        agentrouter_bearer_token = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
         if not agentrouter_bearer_token:
             raise RuntimeError(
-                "Set GEMINI_API_KEY for direct Gemini embeddings, or set ANTHROPIC_API_KEY/ANTHROPIC_AUTH_TOKEN (and install openai SDK) to route embeddings via AgentRouter OpenAI endpoint."
+                "Set GEMINI_API_KEY for direct Gemini embeddings, or set ANTHROPIC_API_KEY (and install openai SDK) to route embeddings via AgentRouter OpenAI endpoint."
             )
         anthropic_base_url = (os.getenv("ANTHROPIC_BASE_URL") or "").strip()
         if anthropic_base_url:
             base_root = anthropic_base_url.rstrip("/")
             openai_base_url = base_root if base_root.endswith("/v1") else f"{base_root}/v1"
         else:
-            openai_base_url = AGENTROUTER_OPENAI_BASE_URL
+            openai_base_url = FALLBACK_OPENAI_BASE_URL
         try:
             from openai import OpenAI  # type: ignore
         except Exception as exc:
@@ -89,9 +86,12 @@ class EmbeddingClient:
 
     def get_embedding(self, text: str, model: str) -> List[float]:
         def call():
-            if self._mode == "gemini" and self._gemini_client is not None:
+            if self._gemini_client is not None:
                 resp = self._gemini_client.embed_content(model=model, content=text)
-                emb = resp.get("embedding")
+                try:
+                    emb = resp["embedding"]
+                except (KeyError, TypeError):
+                    emb = getattr(resp, "embedding", None)
                 if emb:
                     return emb
                 raise RuntimeError(f"Unexpected Gemini embedding response shape: {resp}")

@@ -24,7 +24,7 @@ THRESHOLDS = [0.80, 0.85, 0.88, 0.90, 0.92, 0.95]
 MAX_RETRIES = 5
 INITIAL_BACKOFF = 2
 PARAPHRASE_RATE_SECONDS = 3
-AGENTROUTER_OPENAI_BASE_URL = "https://agentrouter.org/v1"
+FALLBACK_OPENAI_BASE_URL = "https://agentrouter.org/v1"
 
 
 class EvaluationClient:
@@ -34,6 +34,14 @@ class EvaluationClient:
         self._openai_client = None
         self._embedding_mode = "unknown"
         self._last_paraphrase_ts = 0.0
+
+        try:
+            import anthropic  # type: ignore
+        except Exception as exc:
+            raise RuntimeError(
+                "anthropic SDK is required for Claude paraphrase generation. Install it with pip."
+            ) from exc
+        self._anthropic_client = anthropic.Anthropic()
         gemini_key = (os.getenv("GEMINI_API_KEY") or "").strip()
         if gemini_key:
             try:
@@ -46,20 +54,17 @@ class EvaluationClient:
                 print(f"Falling back from google-generativeai SDK: {exc}")
 
         if self._embedding_mode == "unknown":
-            agentrouter_bearer_token = (
-                (os.getenv("ANTHROPIC_API_KEY") or "").strip()
-                or (os.getenv("ANTHROPIC_AUTH_TOKEN") or "").strip()
-            )
+            agentrouter_bearer_token = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
             if not agentrouter_bearer_token:
                 raise RuntimeError(
-                    "Set GEMINI_API_KEY for direct Gemini embeddings, or set ANTHROPIC_API_KEY/ANTHROPIC_AUTH_TOKEN (and install openai SDK) to route embeddings via AgentRouter OpenAI endpoint."
+                    "Set GEMINI_API_KEY for direct Gemini embeddings, or set ANTHROPIC_API_KEY (and install openai SDK) to route embeddings via AgentRouter OpenAI endpoint."
                 )
             anthropic_base_url = (os.getenv("ANTHROPIC_BASE_URL") or "").strip()
             if anthropic_base_url:
                 base_root = anthropic_base_url.rstrip("/")
                 openai_base_url = base_root if base_root.endswith("/v1") else f"{base_root}/v1"
             else:
-                openai_base_url = AGENTROUTER_OPENAI_BASE_URL
+                openai_base_url = FALLBACK_OPENAI_BASE_URL
             try:
                 from openai import OpenAI  # type: ignore
             except Exception as exc:
@@ -86,9 +91,12 @@ class EvaluationClient:
 
     def get_embedding(self, text: str, model: str) -> List[float]:
         def call():
-            if self._embedding_mode == "gemini" and self._gemini_client is not None:
+            if self._gemini_client is not None:
                 resp = self._gemini_client.embed_content(model=model, content=text)
-                emb = resp.get("embedding")
+                try:
+                    emb = resp["embedding"]
+                except (KeyError, TypeError):
+                    emb = getattr(resp, "embedding", None)
                 if emb:
                     return emb
                 raise RuntimeError(f"Unexpected Gemini embedding response shape: {resp}")
@@ -119,16 +127,7 @@ class EvaluationClient:
 
         def call():
             if self._anthropic_client is None:
-                try:
-                    import anthropic  # type: ignore
-                except Exception as exc:
-                    raise RuntimeError(
-                        "anthropic SDK is required for Claude paraphrase generation. Install it with pip."
-                    ) from exc
-                self._anthropic_client = anthropic.Anthropic(
-                    base_url=os.getenv("ANTHROPIC_BASE_URL") or None,
-                    api_key=os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN") or None,
-                )
+                raise RuntimeError("Anthropic client is not configured")
             resp = self._anthropic_client.messages.create(
                 model=PARAPHRASE_MODEL,
                 system="You output strict JSON only.",
