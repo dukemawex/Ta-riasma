@@ -78,3 +78,31 @@ A static UI is included under `frontend/`.
   - recommended threshold for operations
 
 For local preview, serve the `evaluation` directory via any static server and open `/frontend/`.
+
+## GitHub Actions (run from phone or frontend)
+
+You can run evaluations without local Python by using:
+
+- Workflow: `.github/workflows/evaluation.yml`
+- Actions page: `https://github.com/dukemawex/Ta-riasma/actions/workflows/evaluation.yml`
+
+### One-time setup
+
+1. Go to **GitHub repo → Settings → Secrets and variables → Actions**.
+2. Add repository secret:
+   - `AGENTROUTER_API_KEY` = your AgentRouter API key
+3. (Optional) Add repository variable:
+   - `AGENTROUTER_BASE_URL` = `https://api.agentrouter.ai/v1`
+
+### Run it (mobile-friendly)
+
+1. Open the Actions page link above.
+2. Tap **Run workflow**.
+3. Choose `target`:
+   - `multilingual`
+   - `duplicate`
+   - `both`
+4. Start run and wait for completion.
+5. Download artifacts from the workflow run (`evaluation-results-*`) to get JSON/MD outputs.
+
+The frontend page also includes a direct button that opens this workflow page.
