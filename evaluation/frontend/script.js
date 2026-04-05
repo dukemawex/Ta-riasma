@@ -4,10 +4,14 @@ async function loadJson(path) {
   return await res.json();
 }
 
+// Minimum separation gap to label multilingual quality signal as strong.
 const MULTI_HEALTH_GAP_THRESHOLD = 0.2;
+// Minimum combined F1 to label duplicate detection as production-ready.
 const DUP_QUALITY_F1_THRESHOLD = 0.8;
+// Canvas label offsets in pixels for x-axis text alignment.
 const LINE_LABEL_X_OFFSET = 18;
 const LINE_LABEL_Y_OFFSET = 10;
+// Bar and gap share ratios across available chart width.
 const BAR_WIDTH_RATIO = 0.64;
 const BAR_GAP_RATIO = 0.36;
 const DISTRIBUTION_COLORS = ['#2563eb', '#16a34a', '#9333ea', '#ea580c'];
@@ -135,6 +139,8 @@ function drawBarChart(canvasId, items) {
         ]
       }]
     );
+    document.getElementById('multi-chart-alt').textContent =
+      `Line chart values — positive mean ${(m.positive_mean ?? 0).toFixed(4)}, negative mean ${(m.negative_mean ?? 0).toFixed(4)}, separation gap ${(m.separation_gap ?? 0).toFixed(4)}.`;
     const health = Number(m.separation_gap ?? 0) >= MULTI_HEALTH_GAP_THRESHOLD ? 'good' : 'risk';
     document.getElementById('multi-insight').innerHTML = `Multilingual stability signal is <b class="${health}">${health === 'good' ? 'strong' : 'weak'}</b> based on current separation gap.`;
     multiStatus.textContent = 'Loaded multilingual results successfully.';
@@ -178,6 +184,8 @@ function drawBarChart(canvasId, items) {
         { color: '#2563eb', values: thresholdRows.map((r) => Number(r.combined_f1 ?? 0)) }
       ]
     );
+    document.getElementById('threshold-chart-alt').textContent =
+      `Threshold chart covers ${thresholdRows.length} threshold points comparing rule, claude, and combined F1 scores.`;
 
     drawBarChart(
       'distribution-chart',
@@ -187,6 +195,8 @@ function drawBarChart(canvasId, items) {
         color: DISTRIBUTION_COLORS[idx % DISTRIBUTION_COLORS.length]
       }))
     );
+    document.getElementById('distribution-chart-alt').textContent =
+      `Distribution mean chart shows ${Object.keys(dist).length} score buckets.`;
     const qualityClass = Number(rec.combined_f1 ?? 0) >= DUP_QUALITY_F1_THRESHOLD ? 'good' : 'risk';
     document.getElementById('dup-insight').innerHTML = `Duplicate stack fit is <b class="${qualityClass}">${qualityClass === 'good' ? 'production-ready' : 'needs tuning'}</b> at current threshold.`;
 
@@ -197,7 +207,7 @@ function drawBarChart(canvasId, items) {
 
   const m = (multiData && multiData.metrics) || {};
   const r = (dupData && dupData.recommended_threshold) || {};
-  const loadedSignals = Number(Boolean(multiData)) + Number(Boolean(dupData));
+  const loadedSignals = (multiData ? 1 : 0) + (dupData ? 1 : 0);
   summary.appendChild(kpi('Separation Gap %', ((Number(m.separation_gap ?? 0) * 100).toFixed(1)) + '%'));
   summary.appendChild(kpi('Duplicate Ops F1', (Number(r.combined_f1 ?? 0)).toFixed(4)));
   summary.appendChild(kpi('Recommended Threshold', (Number(r.threshold ?? 0)).toFixed(2)));
