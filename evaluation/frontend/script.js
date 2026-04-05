@@ -4,9 +4,9 @@ async function loadJson(path) {
   return await res.json();
 }
 
-// Minimum separation gap (from observed eval behavior) used to flag healthy multilingual separation.
+// Minimum separation gap (0.2) mirrors current evaluation interpretation where >=0.2 indicates robust positive/negative separation.
 const MULTI_HEALTH_GAP_THRESHOLD = 0.2;
-// Minimum combined F1 (operational quality bar) used to mark duplicate detection as production-ready.
+// Minimum combined F1 (0.8) aligns with the current operations quality bar before recommending production rollout.
 const DUP_QUALITY_F1_THRESHOLD = 0.8;
 // Canvas label offsets in pixels for x-axis text alignment.
 const LINE_LABEL_Y_OFFSET = 10;
