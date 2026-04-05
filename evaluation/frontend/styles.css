@@ -1,0 +1,12 @@
+:root { color-scheme: light dark; font-family: Inter, system-ui, sans-serif; }
+body { margin: 0; padding: 1.25rem; max-width: 1000px; margin-inline: auto; }
+header h1 { margin: 0 0 .25rem; }
+.card { border: 1px solid #8884; border-radius: 12px; padding: 1rem; margin-top: 1rem; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .5rem; }
+.kpi { border: 1px solid #8883; border-radius: 8px; padding: .6rem; }
+.kpi b { display: block; font-size: 1rem; margin-top: .2rem; }
+.highlight { font-size: 1.1rem; font-weight: 700; margin-bottom: .75rem; }
+.muted { opacity: .75; margin-top: .5rem; font-size: .9rem; }
+table { width: 100%; border-collapse: collapse; margin-top: .75rem; }
+th, td { border: 1px solid #8883; padding: .45rem; text-align: right; }
+th:first-child, td:first-child { text-align: left; }

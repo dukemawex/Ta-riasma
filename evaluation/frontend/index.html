@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Taíriasma Evaluation UI</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Taíriasma Evaluation Explainability Dashboard</h1>
+    <p>Publication-ready interpretation layer for Item 4 and Item 5 outputs.</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Multilingual Embedding Evaluation (Item 4)</h2>
+      <div id="multi-metrics" class="grid"></div>
+      <div id="multi-status" class="muted"></div>
+    </section>
+
+    <section class="card">
+      <h2>Duplicate Detection Evaluation (Item 5)</h2>
+      <div id="dup-threshold" class="highlight"></div>
+      <div id="dup-distribution" class="grid"></div>
+      <table id="threshold-table">
+        <thead>
+          <tr>
+            <th>Threshold</th><th>Rule F1</th><th>Claude F1</th><th>Combined F1</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div id="dup-status" class="muted"></div>
+    </section>
+  </main>
+
+  <script src="./script.js"></script>
+</body>
+</html>
