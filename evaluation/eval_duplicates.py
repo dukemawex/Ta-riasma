@@ -90,36 +90,39 @@ class EvaluationClient:
         raise RuntimeError("Backoff exhausted unexpectedly")
 
     @staticmethod
-    def _extract_embedding(resp) -> Optional[List[float]]:
-        if resp is None:
+    def _extract_embedding(response) -> Optional[List[float]]:
+        if response is None:
             return None
 
         # google-genai typed response paths
-        if hasattr(resp, "embeddings") and getattr(resp, "embeddings", None):
-            first = resp.embeddings[0]
+        embeddings_attr = getattr(response, "embeddings", None)
+        if embeddings_attr:
+            first = embeddings_attr[0]
             if hasattr(first, "values") and first.values:
                 return list(first.values)
             if hasattr(first, "embedding") and first.embedding:
                 return list(first.embedding)
-        if hasattr(resp, "embedding") and getattr(resp, "embedding", None):
-            emb = resp.embedding
+        emb_attr = getattr(response, "embedding", None)
+        if emb_attr:
+            emb = emb_attr
             if hasattr(emb, "values") and emb.values:
                 return list(emb.values)
             if isinstance(emb, list):
                 return emb
 
         # OpenAI typed response path
-        if hasattr(resp, "data") and getattr(resp, "data", None):
-            first = resp.data[0]
+        data_attr = getattr(response, "data", None)
+        if data_attr:
+            first = data_attr[0]
             if hasattr(first, "embedding") and first.embedding:
                 return list(first.embedding)
 
         # dict-like fallback paths
-        if isinstance(resp, dict):
-            emb = resp.get("embedding")
+        if isinstance(response, dict):
+            emb = response.get("embedding")
             if isinstance(emb, list) and emb:
                 return emb
-            embeddings = resp.get("embeddings")
+            embeddings = response.get("embeddings")
             if isinstance(embeddings, list) and embeddings:
                 first = embeddings[0]
                 if isinstance(first, dict):
@@ -127,7 +130,7 @@ class EvaluationClient:
                         return first["values"]
                     if isinstance(first.get("embedding"), list) and first.get("embedding"):
                         return first["embedding"]
-            data = resp.get("data")
+            data = response.get("data")
             if isinstance(data, list) and data:
                 first = data[0]
                 if isinstance(first, dict) and isinstance(first.get("embedding"), list) and first.get("embedding"):
