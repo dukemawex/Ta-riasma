@@ -4,12 +4,11 @@ async function loadJson(path) {
   return await res.json();
 }
 
-// Minimum separation gap to label multilingual quality signal as strong.
+// Minimum separation gap (from observed eval behavior) used to flag healthy multilingual separation.
 const MULTI_HEALTH_GAP_THRESHOLD = 0.2;
-// Minimum combined F1 to label duplicate detection as production-ready.
+// Minimum combined F1 (operational quality bar) used to mark duplicate detection as production-ready.
 const DUP_QUALITY_F1_THRESHOLD = 0.8;
 // Canvas label offsets in pixels for x-axis text alignment.
-const LINE_LABEL_X_OFFSET = 18;
 const LINE_LABEL_Y_OFFSET = 10;
 // Bar and gap share ratios across available chart width.
 const BAR_WIDTH_RATIO = 0.64;
@@ -32,7 +31,10 @@ function drawLineChart(canvasId, labels, datasets) {
   const pad = { top: 20, right: 16, bottom: 32, left: 42 };
 
   const allValues = datasets.flatMap((ds) => ds.values).filter((v) => Number.isFinite(v));
-  if (!allValues.length) return;
+  if (!allValues.length) {
+    console.warn(`[Ta-riasma UI] No finite values for line chart: ${canvasId}`);
+    return;
+  }
   const min = Math.min(...allValues);
   const max = Math.max(...allValues);
   const range = max - min || 1;
@@ -74,7 +76,9 @@ function drawLineChart(canvasId, labels, datasets) {
   ctx.font = '12px Inter, sans-serif';
   labels.forEach((label, i) => {
     const x = xFor(i);
-    ctx.fillText(String(label), x - LINE_LABEL_X_OFFSET, h - LINE_LABEL_Y_OFFSET);
+    const text = String(label);
+    const textW = ctx.measureText(text).width;
+    ctx.fillText(text, x - (textW / 2), h - LINE_LABEL_Y_OFFSET);
   });
 }
 
@@ -87,6 +91,10 @@ function drawBarChart(canvasId, items) {
   const pad = { top: 20, right: 16, bottom: 40, left: 40 };
 
   const max = Math.max(...items.map((i) => i.value), 1);
+  if (!Number.isFinite(max)) {
+    console.warn(`[Ta-riasma UI] Invalid bar values for chart: ${canvasId}`);
+    return;
+  }
   const chartW = w - pad.left - pad.right;
   const chartH = h - pad.top - pad.bottom;
   const safeCount = Math.max(items.length, 1);
@@ -208,7 +216,7 @@ function drawBarChart(canvasId, items) {
   const m = (multiData && multiData.metrics) || {};
   const r = (dupData && dupData.recommended_threshold) || {};
   const loadedSignals = (multiData ? 1 : 0) + (dupData ? 1 : 0);
-  summary.appendChild(kpi('Separation Gap %', ((Number(m.separation_gap ?? 0) * 100).toFixed(1)) + '%'));
+  summary.appendChild(kpi('Separation Gap %', `${(Number(m.separation_gap ?? 0) * 100).toFixed(1)}%`));
   summary.appendChild(kpi('Duplicate Ops F1', (Number(r.combined_f1 ?? 0)).toFixed(4)));
   summary.appendChild(kpi('Recommended Threshold', (Number(r.threshold ?? 0)).toFixed(2)));
   summary.appendChild(kpi('Data Coverage', `${((loadedSignals / 2) * 100).toFixed(0)}%`));
