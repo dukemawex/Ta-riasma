@@ -96,7 +96,7 @@ class EvaluationClient:
 
         # google-genai typed response paths
         embeddings_attr = getattr(response, "embeddings", None)
-        if embeddings_attr:
+        if isinstance(embeddings_attr, list) and embeddings_attr:
             first = embeddings_attr[0]
             if hasattr(first, "values") and first.values:
                 return list(first.values)
@@ -112,7 +112,7 @@ class EvaluationClient:
 
         # OpenAI typed response path
         data_attr = getattr(response, "data", None)
-        if data_attr:
+        if isinstance(data_attr, list) and data_attr:
             first = data_attr[0]
             if hasattr(first, "embedding") and first.embedding:
                 return list(first.embedding)
@@ -126,15 +126,19 @@ class EvaluationClient:
             if isinstance(embeddings, list) and embeddings:
                 first = embeddings[0]
                 if isinstance(first, dict):
-                    if isinstance(first.get("values"), list) and first.get("values"):
-                        return first["values"]
-                    if isinstance(first.get("embedding"), list) and first.get("embedding"):
-                        return first["embedding"]
+                    values = first.get("values")
+                    if isinstance(values, list) and values:
+                        return values
+                    first_embedding = first.get("embedding")
+                    if isinstance(first_embedding, list) and first_embedding:
+                        return first_embedding
             data = response.get("data")
             if isinstance(data, list) and data:
                 first = data[0]
-                if isinstance(first, dict) and isinstance(first.get("embedding"), list) and first.get("embedding"):
-                    return first["embedding"]
+                if isinstance(first, dict):
+                    first_embedding = first.get("embedding")
+                    if isinstance(first_embedding, list) and first_embedding:
+                        return first_embedding
 
         return None
 
