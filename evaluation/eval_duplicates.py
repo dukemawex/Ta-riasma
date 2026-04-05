@@ -388,7 +388,7 @@ def build_rule_variants(base: List[dict]) -> Dict[str, dict]:
     return variants
 
 
-def build_claude_variants(base: List[dict], client: AgentRouterClient, paraphrase_cache: Dict[str, dict]) -> Dict[str, dict]:
+def build_claude_variants(base: List[dict], client: EvaluationClient, paraphrase_cache: Dict[str, dict]) -> Dict[str, dict]:
     variants: Dict[str, dict] = {}
     for item in base:
         pid = item["id"]
@@ -485,7 +485,7 @@ def build_pairs(base: List[dict], rule_variants: Dict[str, dict], claude_variant
 
 def ensure_embeddings(
     pairs: List[dict],
-    client: AgentRouterClient,
+    client: EvaluationClient,
     embed_cache: Dict[str, List[float]],
 ) -> Dict[str, List[float]]:
     texts: Dict[str, str] = {}
