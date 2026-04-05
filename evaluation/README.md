@@ -72,10 +72,11 @@ A static UI is included under `frontend/`.
 - Deploy directly on Vercel as a static site.
 - Open `index.html` to load generated reports from `../results/*.json`.
 - The UI surfaces:
-  - multilingual pair score summary and metrics
-  - duplicate score distributions
-  - threshold-wise precision/recall/F1
-  - recommended threshold for operations
+  - YC-style executive summary KPIs for product/ops stakeholders
+  - multilingual pair score summary and metric trend chart
+  - duplicate score distributions with visual bar chart
+  - threshold-wise performance table and F1 trend chart
+  - recommended threshold and automated quality insights for operations
 
 For local preview, serve the `evaluation` directory via any static server and open `/frontend/`.
 
