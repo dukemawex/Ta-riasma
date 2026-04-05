@@ -2,3 +2,4 @@ agentrouter
 numpy
 scipy
 tabulate
+google-genai>=1.70.0

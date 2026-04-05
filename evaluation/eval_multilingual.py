@@ -4,20 +4,24 @@ import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from scipy.spatial.distance import cosine
 from tabulate import tabulate
-from urllib import error
-
-
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 CACHE_PATH = RESULTS_DIR / "embedding_cache.json"
 RESULT_JSON_PATH = RESULTS_DIR / "multilingual_results.json"
 REPORT_MD_PATH = RESULTS_DIR / "multilingual_report.md"
 
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-002")
+DEFAULT_EMBEDDING_MODELS = ["text-embedding-004", "gemini-embedding-2"]
+EMBEDDING_MODELS = [
+    m.strip()
+    for m in os.getenv("EMBEDDING_MODELS", ",".join(DEFAULT_EMBEDDING_MODELS)).split(",")
+    if m.strip()
+]
+if not EMBEDDING_MODELS:
+    EMBEDDING_MODELS = DEFAULT_EMBEDDING_MODELS[:]
 MAX_RETRIES = 5
 INITIAL_BACKOFF = 2
 FALLBACK_OPENAI_BASE_URL = "https://agentrouter.org/v1"
@@ -40,14 +44,13 @@ class EmbeddingClient:
         gemini_key = (os.getenv("GEMINI_API_KEY") or "").strip()
         if gemini_key:
             try:
-                import google.generativeai as genai  # type: ignore
+                from google import genai  # type: ignore
 
-                genai.configure(api_key=gemini_key)
-                self._gemini_client = genai
+                self._gemini_client = genai.Client(api_key=gemini_key)
                 self._mode = "gemini"
                 return
             except Exception as exc:
-                print(f"Falling back from google-generativeai SDK: {exc}")
+                print(f"Falling back from google-genai SDK: {exc}")
 
         agentrouter_bearer_token = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
         if not agentrouter_bearer_token:
@@ -76,35 +79,91 @@ class EmbeddingClient:
                 return fn()
             except Exception as exc:
                 msg = str(exc).lower()
-                is_rate_limited = "429" in msg or "rate" in msg
-                if not is_rate_limited or attempt == MAX_RETRIES:
+                is_retryable = (
+                    "429" in msg
+                    or "rate" in msg
+                    or "timeout" in msg
+                    or "temporar" in msg
+                    or "connection" in msg
+                    or "dns" in msg
+                    or "unavailable" in msg
+                    or "503" in msg
+                )
+                if not is_retryable or attempt == MAX_RETRIES:
                     raise
-                print(f"Rate limit detected, retrying in {backoff}s (attempt {attempt}/{MAX_RETRIES})")
+                print(f"Retryable API/network error, retrying in {backoff}s (attempt {attempt}/{MAX_RETRIES})")
                 time.sleep(backoff)
                 backoff *= 2
         raise RuntimeError("Retry loop exhausted unexpectedly")
 
-    def get_embedding(self, text: str, model: str) -> List[float]:
+    @staticmethod
+    def _extract_embedding(resp) -> Optional[List[float]]:
+        if resp is None:
+            return None
+
+        # google-genai typed response paths
+        if hasattr(resp, "embeddings") and getattr(resp, "embeddings", None):
+            first = resp.embeddings[0]
+            if hasattr(first, "values") and first.values:
+                return list(first.values)
+            if hasattr(first, "embedding") and first.embedding:
+                return list(first.embedding)
+        if hasattr(resp, "embedding") and getattr(resp, "embedding", None):
+            emb = resp.embedding
+            if hasattr(emb, "values") and emb.values:
+                return list(emb.values)
+            if isinstance(emb, list):
+                return emb
+
+        # dict-like fallback paths
+        if isinstance(resp, dict):
+            emb = resp.get("embedding")
+            if isinstance(emb, list) and emb:
+                return emb
+            embeddings = resp.get("embeddings")
+            if isinstance(embeddings, list) and embeddings:
+                first = embeddings[0]
+                if isinstance(first, dict):
+                    if isinstance(first.get("values"), list) and first.get("values"):
+                        return first["values"]
+                    if isinstance(first.get("embedding"), list) and first.get("embedding"):
+                        return first["embedding"]
+
+        return None
+
+    def _get_embedding_for_model(self, text: str, model: str) -> List[float]:
         def call():
             if self._gemini_client is not None:
-                resp = self._gemini_client.embed_content(model=model, content=text)
-                try:
-                    emb = resp["embedding"]
-                except (KeyError, TypeError):
-                    emb = getattr(resp, "embedding", None)
+                resp = self._gemini_client.models.embed_content(model=model, contents=text)
+                emb = self._extract_embedding(resp)
                 if emb:
                     return emb
-                raise RuntimeError(f"Unexpected Gemini embedding response shape: {resp}")
+                raise RuntimeError(f"Unexpected Gemini embedding response shape for {model}: {resp}")
 
             if self._openai_client is not None:
                 resp = self._openai_client.embeddings.create(model=model, input=text)
                 if resp.data:
                     return resp.data[0].embedding
-                raise RuntimeError("OpenAI-compatible embedding response contained no vectors")
+                raise RuntimeError(f"OpenAI-compatible embedding response contained no vectors for {model}")
 
             raise RuntimeError("Embedding client is not configured")
 
         return self._with_backoff(call)
+
+    def get_embedding(self, text: str, models: List[str]) -> List[float]:
+        last_error = None
+        for model in models:
+            try:
+                return self._get_embedding_for_model(text, model)
+            except Exception as exc:
+                last_error = exc
+                msg = str(exc).lower()
+                # Try next configured model for unsupported/not found cases.
+                if "404" in msg or "not found" in msg or "unsupported" in msg or "invalid model" in msg:
+                    print(f"Model '{model}' unavailable; trying next configured model.")
+                    continue
+                raise
+        raise RuntimeError(f"All embedding models failed ({', '.join(models)}): {last_error}")
 
 
 def safe_cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
@@ -235,7 +294,7 @@ def main() -> None:
             print(f"Fetching embedding: proposal={proposal_id}, lang={lang}")
             text = proposals[proposal_id][lang]
             try:
-                emb = client.get_embedding(text, EMBEDDING_MODEL)
+                emb = client.get_embedding(text, EMBEDDING_MODELS)
                 embeddings[(proposal_id, lang)] = emb
                 cache[cache_key] = emb
                 save_cache(CACHE_PATH, cache)
@@ -248,7 +307,8 @@ def main() -> None:
         raise RuntimeError(
             "Insufficient embeddings for multilingual evaluation. "
             f"Loaded {loaded_embeddings}/{total_required}. "
-            "Check network/DNS access and GEMINI_API_KEY or ANTHROPIC_API_KEY configuration."
+            f"Checked models={EMBEDDING_MODELS}. "
+            "Check network/DNS access, model availability, and GEMINI_API_KEY or ANTHROPIC_API_KEY configuration."
         )
 
     positive_scores: List[PairScore] = []
