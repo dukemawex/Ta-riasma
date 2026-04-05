@@ -19,8 +19,10 @@ jobs:
     permissions:
       contents: read
     env:
-      AGENTROUTER_API_KEY: ${{ secrets.AGENTROUTER_API_KEY }}
-      AGENTROUTER_BASE_URL: ${{ vars.AGENTROUTER_BASE_URL }}
+      ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
+      ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,16 +32,23 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Validate required secret
+      - name: Validate required secrets
         run: |
-          if [ -z "${AGENTROUTER_API_KEY}" ]; then
-            echo "AGENTROUTER_API_KEY is not set. Add it in Settings > Secrets and variables > Actions."
-            exit 1
+          missing=0
+          for key in ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY; do
+            if [ -z "${!key}" ]; then
+              echo "$key is not set. Add it in Settings > Secrets and variables > Actions."
+              missing=1
+            fi
+          done
+          if [ -z "${GEMINI_API_KEY}" ]; then
+            echo "GEMINI_API_KEY is not set; embeddings will route via AgentRouter OpenAI endpoint using ANTHROPIC_API_KEY."
           fi
+          if [ "$missing" -ne 0 ]; then exit 1; fi
 
       - name: Install dependencies
         working-directory: evaluation
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt anthropic google-generativeai openai
 
       - name: Run multilingual evaluation
         if: ${{ github.event.inputs.target == 'multilingual' || github.event.inputs.target == 'both' }}
