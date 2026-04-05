@@ -258,6 +258,15 @@ def main() -> None:
             except Exception as exc:
                 print(f"Failed embedding for proposal={proposal_id}, lang={lang}: {exc}")
 
+    total_required = len(proposals) * len(languages)
+    loaded_embeddings = len(embeddings)
+    if loaded_embeddings < total_required:
+        raise RuntimeError(
+            "Insufficient embeddings for multilingual evaluation. "
+            f"Loaded {loaded_embeddings}/{total_required}. "
+            "Check network/DNS access to AgentRouter and AGENTROUTER_BASE_URL/API key configuration."
+        )
+
     positive_scores: List[PairScore] = []
     negative_scores: List[PairScore] = []
 
@@ -300,6 +309,16 @@ def main() -> None:
                         label="negative",
                     )
                 )
+
+    expected_positive = len(proposals) * len(target_languages)
+    expected_negative = len(target_languages) * 3 * (len(proposals) - 1)
+    if len(positive_scores) < expected_positive or len(negative_scores) < expected_negative:
+        raise RuntimeError(
+            "Incomplete multilingual pair coverage. "
+            f"Positive pairs: {len(positive_scores)}/{expected_positive}, "
+            f"negative pairs: {len(negative_scores)}/{expected_negative}. "
+            "Evaluation aborted to avoid misleading metrics."
+        )
 
     pos_vals = np.array([p.similarity for p in positive_scores], dtype=float)
     neg_vals = np.array([p.similarity for p in negative_scores], dtype=float)

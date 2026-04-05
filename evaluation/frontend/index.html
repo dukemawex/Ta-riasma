@@ -3,43 +3,60 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Taíriasma Evaluation UI</title>
+  <title>Taíriasma Analytics Console</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <header>
-    <h1>Taíriasma Evaluation Explainability Dashboard</h1>
-    <p>Publication-ready interpretation layer for Item 4 and Item 5 outputs.</p>
-  </header>
-
-  <main>
-    <section class="card">
-      <h2>Run Evaluations from GitHub (Mobile-friendly)</h2>
-      <p>
-        Tap the button below to open the GitHub Actions workflow, then click
-        <b>Run workflow</b> and choose <code>multilingual</code>,
-        <code>duplicate</code>, or <code>both</code>.
-      </p>
+  <header class="hero">
+    <p class="eyebrow">YC-grade product surface</p>
+    <h1>Taíriasma Growth + Trust Analytics Console</h1>
+    <p class="subtitle">A startup-ready command center for multilingual quality and duplicate risk with live KPI cards, charts, and operational recommendations.</p>
+    <div class="hero-actions">
       <a
-        class="button"
+        class="button primary"
         href="https://github.com/dukemawex/Ta-riasma/actions/workflows/evaluation.yml"
         target="_blank"
         rel="noopener noreferrer"
       >
-        Open GitHub Actions Runner
+        Run Evaluations on GitHub
       </a>
+      <span class="muted">Choose <code>multilingual</code>, <code>duplicate</code>, or <code>both</code>.</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="card summary-card">
+      <h2>Executive Summary</h2>
+      <div id="summary-kpis" class="grid kpi-grid"></div>
+      <div id="summary-status" class="muted"></div>
     </section>
 
     <section class="card">
-      <h2>Multilingual Embedding Evaluation (Item 4)</h2>
-      <div id="multi-metrics" class="grid"></div>
+      <h2>Multilingual Embedding Stability (Item 4)</h2>
+      <div id="multi-metrics" class="grid kpi-grid"></div>
+      <div class="chart-wrap">
+        <h3>Core Metric Trend</h3>
+        <canvas id="multi-chart" width="900" height="280" aria-label="Multilingual metrics chart"></canvas>
+        <p id="multi-chart-alt" class="chart-alt muted"></p>
+      </div>
+      <div id="multi-insight" class="insight"></div>
       <div id="multi-status" class="muted"></div>
     </section>
 
     <section class="card">
-      <h2>Duplicate Detection Evaluation (Item 5)</h2>
+      <h2>Duplicate Detection Performance (Item 5)</h2>
       <div id="dup-threshold" class="highlight"></div>
-      <div id="dup-distribution" class="grid"></div>
+      <div id="dup-distribution" class="grid kpi-grid"></div>
+      <div class="chart-wrap">
+        <h3>F1 by Threshold</h3>
+        <canvas id="threshold-chart" width="900" height="320" aria-label="Threshold performance chart"></canvas>
+        <p id="threshold-chart-alt" class="chart-alt muted"></p>
+      </div>
+      <div class="chart-wrap">
+        <h3>Score Distribution Means</h3>
+        <canvas id="distribution-chart" width="900" height="280" aria-label="Score distribution chart"></canvas>
+        <p id="distribution-chart-alt" class="chart-alt muted"></p>
+      </div>
       <table id="threshold-table">
         <thead>
           <tr>
@@ -48,6 +65,7 @@
         </thead>
         <tbody></tbody>
       </table>
+      <div id="dup-insight" class="insight"></div>
       <div id="dup-status" class="muted"></div>
     </section>
   </main>
