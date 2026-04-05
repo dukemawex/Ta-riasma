@@ -5,7 +5,7 @@ import random
 import re
 import time
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from scipy.spatial.distance import cosine
@@ -89,23 +89,67 @@ class EvaluationClient:
                 backoff *= 2
         raise RuntimeError("Backoff exhausted unexpectedly")
 
+    @staticmethod
+    def _extract_embedding(resp) -> Optional[List[float]]:
+        if resp is None:
+            return None
+
+        # google-genai typed response paths
+        if hasattr(resp, "embeddings") and getattr(resp, "embeddings", None):
+            first = resp.embeddings[0]
+            if hasattr(first, "values") and first.values:
+                return list(first.values)
+            if hasattr(first, "embedding") and first.embedding:
+                return list(first.embedding)
+        if hasattr(resp, "embedding") and getattr(resp, "embedding", None):
+            emb = resp.embedding
+            if hasattr(emb, "values") and emb.values:
+                return list(emb.values)
+            if isinstance(emb, list):
+                return emb
+
+        # OpenAI typed response path
+        if hasattr(resp, "data") and getattr(resp, "data", None):
+            first = resp.data[0]
+            if hasattr(first, "embedding") and first.embedding:
+                return list(first.embedding)
+
+        # dict-like fallback paths
+        if isinstance(resp, dict):
+            emb = resp.get("embedding")
+            if isinstance(emb, list) and emb:
+                return emb
+            embeddings = resp.get("embeddings")
+            if isinstance(embeddings, list) and embeddings:
+                first = embeddings[0]
+                if isinstance(first, dict):
+                    if isinstance(first.get("values"), list) and first.get("values"):
+                        return first["values"]
+                    if isinstance(first.get("embedding"), list) and first.get("embedding"):
+                        return first["embedding"]
+            data = resp.get("data")
+            if isinstance(data, list) and data:
+                first = data[0]
+                if isinstance(first, dict) and isinstance(first.get("embedding"), list) and first.get("embedding"):
+                    return first["embedding"]
+
+        return None
+
     def get_embedding(self, text: str, model: str) -> List[float]:
         def call():
             if self._gemini_client is not None:
-                resp = self._gemini_client.embed_content(model="gemini-embedding-001", content=text)
-                try:
-                    emb = resp["embedding"]
-                except (KeyError, TypeError):
-                    emb = getattr(resp, "embedding", None)
+                resp = self._gemini_client.embed_content(model=model, content=text)
+                emb = self._extract_embedding(resp)
                 if emb:
                     return emb
                 raise RuntimeError(f"Unexpected Gemini embedding response shape: {resp}")
 
             if self._openai_client is not None:
                 resp = self._openai_client.embeddings.create(model=model, input=text)
-                if resp.data:
-                    return resp.data[0].embedding
-                raise RuntimeError("OpenAI-compatible embedding response contained no vectors")
+                emb = self._extract_embedding(resp)
+                if emb:
+                    return emb
+                raise RuntimeError(f"OpenAI-compatible embedding response contained no vectors: {resp}")
 
             raise RuntimeError("Embedding client is not configured")
 
