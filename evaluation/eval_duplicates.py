@@ -5,7 +5,7 @@ import random
 import re
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from scipy.spatial.distance import cosine
@@ -90,7 +90,7 @@ class EvaluationClient:
         raise RuntimeError("Backoff exhausted unexpectedly")
 
     @staticmethod
-    def _extract_embedding(response) -> Optional[List[float]]:
+    def _extract_embedding(response: Any) -> Optional[List[float]]:
         if response is None:
             return None
 
@@ -98,15 +98,18 @@ class EvaluationClient:
         embeddings_attr = getattr(response, "embeddings", None)
         if isinstance(embeddings_attr, list) and embeddings_attr:
             first = embeddings_attr[0]
-            if hasattr(first, "values") and first.values:
-                return list(first.values)
-            if hasattr(first, "embedding") and first.embedding:
-                return list(first.embedding)
+            first_values = getattr(first, "values", None)
+            if first_values is not None:
+                return list(first_values)
+            first_embedding = getattr(first, "embedding", None)
+            if first_embedding is not None:
+                return list(first_embedding)
         emb_attr = getattr(response, "embedding", None)
         if emb_attr:
             emb = emb_attr
-            if hasattr(emb, "values") and emb.values:
-                return list(emb.values)
+            emb_values = getattr(emb, "values", None)
+            if emb_values is not None:
+                return list(emb_values)
             if isinstance(emb, list):
                 return emb
 
@@ -114,8 +117,9 @@ class EvaluationClient:
         data_attr = getattr(response, "data", None)
         if isinstance(data_attr, list) and data_attr:
             first = data_attr[0]
-            if hasattr(first, "embedding") and first.embedding:
-                return list(first.embedding)
+            first_embedding = getattr(first, "embedding", None)
+            if first_embedding is not None:
+                return list(first_embedding)
 
         # dict-like fallback paths
         if isinstance(response, dict):
