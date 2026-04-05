@@ -10,6 +10,7 @@ import numpy as np
 from scipy.spatial.distance import cosine
 from tabulate import tabulate
 from urllib import error, request
+from urllib.parse import urlparse
 
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
@@ -20,6 +21,7 @@ REPORT_MD_PATH = RESULTS_DIR / "multilingual_report.md"
 EMBEDDING_MODEL = "text-embedding-004"
 MAX_RETRIES = 5
 INITIAL_BACKOFF = 2
+DEFAULT_AGENTROUTER_BASE_URL = "https://api.agentrouter.ai/v1"
 
 
 @dataclass
@@ -33,7 +35,7 @@ class PairScore:
 class AgentRouterClient:
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.base_url = os.getenv("AGENTROUTER_BASE_URL", "https://api.agentrouter.ai/v1").rstrip("/")
+        self.base_url = self._resolve_base_url(os.getenv("AGENTROUTER_BASE_URL"))
         self._sdk_client = None
         try:
             from agentrouter import AgentRouter  # type: ignore
@@ -41,6 +43,22 @@ class AgentRouterClient:
             self._sdk_client = AgentRouter(api_key=api_key)
         except Exception:
             self._sdk_client = None
+
+    @staticmethod
+    def _resolve_base_url(raw_base_url: Optional[str]) -> str:
+        candidate = (raw_base_url or "").strip().rstrip("/")
+        if not candidate:
+            return DEFAULT_AGENTROUTER_BASE_URL
+
+        parsed = urlparse(candidate)
+        if parsed.scheme in {"http", "https"} and parsed.netloc:
+            return candidate
+
+        print(
+            f"Invalid AGENTROUTER_BASE_URL '{raw_base_url}'. "
+            f"Falling back to {DEFAULT_AGENTROUTER_BASE_URL}."
+        )
+        return DEFAULT_AGENTROUTER_BASE_URL
 
     def _http_post(self, endpoint: str, payload: dict) -> dict:
         req = request.Request(
