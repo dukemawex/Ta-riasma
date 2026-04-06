@@ -55,7 +55,7 @@ def get_completion(prompt: str, max_tokens: int = 512) -> str:
 
         client_kwargs = {}
         base_url = (os.getenv("ANTHROPIC_BASE_URL") or "").strip()
-        api_key = (os.getenv("ANTHROPIC_AUTH_TOKEN") or os.getenv("ANTHROPIC_API_KEY") or "").strip()
+        api_key = (os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN") or "").strip()
         if base_url:
             client_kwargs["base_url"] = base_url
         if api_key:
@@ -63,7 +63,7 @@ def get_completion(prompt: str, max_tokens: int = 512) -> str:
 
         client = anthropic.Anthropic(**client_kwargs)
         response = client.messages.create(
-            model=os.getenv("PARAPHRASE_MODEL", DEFAULT_CLAUDE_MODEL),
+            model=(os.getenv("CLAUDE_MODEL") or os.getenv("PARAPHRASE_MODEL") or DEFAULT_CLAUDE_MODEL),
             messages=[{"role": "user", "content": prompt}],
             max_tokens=max_tokens,
         )
