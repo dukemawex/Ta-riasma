@@ -34,7 +34,7 @@ def get_completion(prompt: str, max_tokens: int = 512) -> str:
 
         client = anthropic.Anthropic(**client_kwargs)
         response = client.messages.create(
-            model=(os.getenv("CLAUDE_MODEL") or DEFAULT_CLAUDE_MODEL),
+            model=(os.getenv("CLAUDE_MODEL") or os.getenv("PARAPHRASE_MODEL") or DEFAULT_CLAUDE_MODEL),
             max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}],
         )
