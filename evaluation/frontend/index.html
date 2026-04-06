@@ -3,73 +3,512 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Taíriasma Analytics Console</title>
-  <link rel="stylesheet" href="./styles.css" />
+  <title>Ta-riasma Evaluation Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0F0F0F;
+      --surface: #1A1A1A;
+      --border: #2A2A2A;
+      --text: #F0EDE8;
+      --muted: #666666;
+      --accent: #E8C547;
+      --skip: #444444;
+      --terminal: #0A0A0A;
+      --display-font: "DM Serif Display", serif;
+      --mono-font: "IBM Plex Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono-font);
+      opacity: 0;
+      transition: opacity 200ms ease;
+    }
+
+    body.loaded { opacity: 1; }
+
+    .app {
+      width: min(100%, 960px);
+      margin: 0 auto;
+      padding: 0 24px 48px;
+    }
+
+    .section {
+      padding: 48px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .top-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 0;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--mono-font);
+    }
+
+    .project-name {
+      margin: 0;
+      font-family: var(--display-font);
+      font-size: 18px;
+      color: var(--text);
+      font-weight: 400;
+    }
+
+    .last-run {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .run-link {
+      display: inline-block;
+      margin-top: 24px;
+      color: var(--accent);
+      border: 1px solid var(--border);
+      text-decoration: none;
+      font-size: 12px;
+      padding: 8px 12px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .metric-hero {
+      display: flex;
+      gap: 48px;
+      align-items: flex-end;
+    }
+
+    .metric-item {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .metric-value {
+      margin: 0;
+      font-family: var(--display-font);
+      font-size: 64px;
+      line-height: 1;
+      font-weight: 400;
+      color: var(--text);
+    }
+
+    .metric-label {
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .status-row {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .status-value {
+      margin-left: 8px;
+      font-style: normal;
+      color: var(--text);
+    }
+
+    .status-pass { color: var(--accent); }
+    .status-fail { color: var(--muted); font-style: italic; }
+    .status-skip { color: var(--skip); }
+
+    .section-label {
+      margin: 0 0 16px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+    }
+
+    .search-input {
+      width: 100%;
+      background: transparent;
+      color: var(--text);
+      font-family: var(--mono-font);
+      font-size: 13px;
+      padding: 10px 0;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      outline: none;
+      border-radius: 0;
+    }
+
+    .search-input::placeholder { color: var(--skip); }
+
+    .table-wrap {
+      margin-top: 16px;
+      overflow-x: auto;
+    }
+
+    .eval-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 700px;
+    }
+
+    .eval-table thead th {
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      font-weight: 400;
+      padding: 12px 8px;
+      white-space: nowrap;
+      font-family: var(--mono-font);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .eval-table tbody td {
+      height: 40px;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 8px;
+      color: var(--text);
+      font-family: var(--mono-font);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .eval-table tbody tr:hover { background: #1F1F1F; }
+
+    .score-col {
+      text-align: right;
+      font-family: var(--display-font) !important;
+      font-size: 16px !important;
+      letter-spacing: 0.02em;
+    }
+
+    .sort-indicator {
+      color: var(--muted);
+      margin-left: 4px;
+      font-size: 11px;
+    }
+
+    .anomalies-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .anomaly-item {
+      padding: 0;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+    }
+
+    .run-log {
+      margin-top: 12px;
+      background: var(--terminal);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 16px;
+      max-height: 320px;
+      overflow: auto;
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--muted);
+      white-space: pre-wrap;
+      font-family: var(--mono-font);
+    }
+
+    .muted-note {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: var(--mono-font);
+    }
+
+    @media (max-width: 600px) {
+      .metric-hero {
+        flex-direction: column;
+        gap: 28px;
+        align-items: flex-start;
+      }
+      .metric-value { font-size: 52px; }
+      .top-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+    }
+  </style>
 </head>
 <body>
-  <header class="hero">
-    <p class="eyebrow">YC-grade product surface</p>
-    <h1>Taíriasma Growth + Trust Analytics Console</h1>
-    <p class="subtitle">A startup-ready command center for multilingual quality and duplicate risk with live KPI cards, charts, and operational recommendations.</p>
-    <div class="hero-actions">
-      <a
-        class="button primary"
-        href="https://github.com/dukemawex/Ta-riasma/actions/workflows/evaluation.yml"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        Run Evaluations on GitHub
-      </a>
-      <span class="muted">Choose <code>multilingual</code>, <code>duplicate</code>, or <code>both</code>.</span>
-    </div>
-  </header>
+  <div class="app">
+    <header class="top-header">
+      <h1 class="project-name">Ta-riasma Evaluation Console</h1>
+      <div id="last-run" class="last-run">last run: not available</div>
+    </header>
 
-  <main>
-    <section class="card summary-card">
-      <h2>Executive Summary</h2>
-      <div id="summary-kpis" class="grid kpi-grid"></div>
-      <div id="summary-status" class="muted"></div>
-    </section>
+    <main>
+      <section class="section">
+        <div class="metric-hero">
+          <div class="metric-item">
+            <p id="metric-gap" class="metric-value">—</p>
+            <div class="metric-label">Separation Gap</div>
+          </div>
+          <div class="metric-item">
+            <p id="metric-pos" class="metric-value">—</p>
+            <div class="metric-label">Positive Mean</div>
+          </div>
+          <div class="metric-item">
+            <p id="metric-neg" class="metric-value">—</p>
+            <div class="metric-label">Negative Mean</div>
+          </div>
+        </div>
+        <a
+          class="run-link"
+          href="https://github.com/dukemawex/Ta-riasma/actions/workflows/evaluation.yml"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open GitHub Actions workflow"
+        >
+          Run Evaluations
+        </a>
+      </section>
 
-    <section class="card">
-      <h2>Multilingual Embedding Stability (Item 4)</h2>
-      <div id="multi-metrics" class="grid kpi-grid"></div>
-      <div class="chart-wrap">
-        <h3>Core Metric Trend</h3>
-        <canvas id="multi-chart" width="900" height="280" aria-label="Multilingual metrics chart"></canvas>
-        <p id="multi-chart-alt" class="chart-alt muted"></p>
-      </div>
-      <div id="multi-insight" class="insight"></div>
-      <div id="multi-status" class="muted"></div>
-    </section>
+      <section class="section">
+        <p class="section-label">Eval Status</p>
+        <div class="status-row">
+          <div>Multilingual <span id="status-multi" class="status-value status-skip">SKIP</span></div>
+          <div>Duplicate <span id="status-dup" class="status-value status-skip">SKIP</span></div>
+          <div>Overall <span id="status-overall" class="status-value status-skip">SKIP</span></div>
+        </div>
+      </section>
 
-    <section class="card">
-      <h2>Duplicate Detection Performance (Item 5)</h2>
-      <div id="dup-threshold" class="highlight"></div>
-      <div id="dup-distribution" class="grid kpi-grid"></div>
-      <div class="chart-wrap">
-        <h3>F1 by Threshold</h3>
-        <canvas id="threshold-chart" width="900" height="320" aria-label="Threshold performance chart"></canvas>
-        <p id="threshold-chart-alt" class="chart-alt muted"></p>
-      </div>
-      <div class="chart-wrap">
-        <h3>Score Distribution Means</h3>
-        <canvas id="distribution-chart" width="900" height="280" aria-label="Score distribution chart"></canvas>
-        <p id="distribution-chart-alt" class="chart-alt muted"></p>
-      </div>
-      <table id="threshold-table">
-        <thead>
-          <tr>
-            <th>Threshold</th><th>Rule F1</th><th>Claude F1</th><th>Combined F1</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-      <div id="dup-insight" class="insight"></div>
-      <div id="dup-status" class="muted"></div>
-    </section>
-  </main>
+      <section class="section">
+        <p class="section-label">Results</p>
+        <input id="search-input" class="search-input" type="text" placeholder="search proposal id, language pair, label, score" />
+        <div class="table-wrap">
+          <table class="eval-table">
+            <thead>
+              <tr>
+                <th data-sort="proposal_id">Proposal<span class="sort-indicator">↕</span></th>
+                <th data-sort="language_pair">Language Pair<span class="sort-indicator">↕</span></th>
+                <th data-sort="label">Label<span class="sort-indicator">↕</span></th>
+                <th data-sort="similarity_score">Score<span class="sort-indicator">↕</span></th>
+              </tr>
+            </thead>
+            <tbody id="results-body"></tbody>
+          </table>
+        </div>
+      </section>
 
-  <script src="./script.js"></script>
+      <section class="section">
+        <p class="section-label">Anomalies</p>
+        <div id="anomalies" class="anomalies-list"></div>
+      </section>
+
+      <section class="section">
+        <p class="section-label">Execution Log</p>
+        <div id="run-log" class="run-log">computing...</div>
+        <div id="log-note" class="muted-note"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const state = {
+      rows: [],
+      filteredRows: [],
+      sortKey: "proposal_id",
+      sortDir: "asc",
+      fileTimes: []
+    };
+
+    function setStatus(el, value) {
+      el.textContent = value;
+      el.classList.remove("status-pass", "status-fail", "status-skip");
+      if (value === "PASS") el.classList.add("status-pass");
+      else if (value === "FAIL") el.classList.add("status-fail");
+      else el.classList.add("status-skip");
+    }
+
+    function formatScore(v) {
+      return Number.isFinite(Number(v)) ? Number(v).toFixed(4) : "—";
+    }
+
+    function compareValues(a, b, key) {
+      const va = a[key];
+      const vb = b[key];
+      if (key === "proposal_id" || key === "similarity_score") {
+        return Number(va ?? 0) - Number(vb ?? 0);
+      }
+      return String(va ?? "").localeCompare(String(vb ?? ""));
+    }
+
+    function sortRows(rows) {
+      const sorted = [...rows].sort((a, b) => compareValues(a, b, state.sortKey));
+      if (state.sortDir === "desc") sorted.reverse();
+      return sorted;
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById("results-body");
+      const q = document.getElementById("search-input").value.trim().toLowerCase();
+      const filtered = q
+        ? state.rows.filter((r) => (
+          `${r.proposal_id} ${r.language_pair} ${r.label} ${formatScore(r.similarity_score)}`.toLowerCase().includes(q)
+        ))
+        : state.rows;
+      state.filteredRows = sortRows(filtered);
+      tbody.innerHTML = state.filteredRows.map((r) => `
+        <tr>
+          <td>${r.proposal_id ?? "—"}</td>
+          <td>${r.language_pair ?? "—"}</td>
+          <td>${r.label ?? "—"}</td>
+          <td class="score-col">${formatScore(r.similarity_score)}</td>
+        </tr>
+      `).join("");
+    }
+
+    function updateSortIndicators() {
+      document.querySelectorAll("th[data-sort]").forEach((th) => {
+        const key = th.getAttribute("data-sort");
+        const span = th.querySelector(".sort-indicator");
+        span.textContent = key === state.sortKey ? (state.sortDir === "asc" ? "↑" : "↓") : "↕";
+      });
+    }
+
+    function latestRunLabel() {
+      if (!state.fileTimes.length) return "last run: not available";
+      const latest = state.fileTimes.reduce((a, b) => (a > b ? a : b));
+      return `last run: ${new Date(latest).toISOString()}`;
+    }
+
+    async function loadWithMeta(path) {
+      const res = await fetch(path);
+      if (!res.ok) throw new Error(`failed: ${path}`);
+      const lm = res.headers.get("last-modified");
+      if (lm) state.fileTimes.push(new Date(lm).getTime());
+      return res.json();
+    }
+
+    async function loadTextWithMeta(path) {
+      const res = await fetch(path);
+      if (!res.ok) throw new Error(`failed: ${path}`);
+      const lm = res.headers.get("last-modified");
+      if (lm) state.fileTimes.push(new Date(lm).getTime());
+      return res.text();
+    }
+
+    function renderAnomalies(rows) {
+      const list = document.getElementById("anomalies");
+      if (!rows.length) {
+        list.innerHTML = '<div class="anomaly-item">No positive failures below 0.85 in available multilingual results.</div>';
+        return;
+      }
+      list.innerHTML = rows.map((r) =>
+        `<div class="anomaly-item">proposal ${r.proposal_id} · ${r.language_pair} · score ${formatScore(r.similarity_score)}</div>`
+      ).join("");
+    }
+
+    (async function main() {
+      document.body.classList.add("loaded");
+      const statusMulti = document.getElementById("status-multi");
+      const statusDup = document.getElementById("status-dup");
+      const statusOverall = document.getElementById("status-overall");
+      const log = document.getElementById("run-log");
+      const logNote = document.getElementById("log-note");
+
+      let multi = null;
+      let dup = null;
+      const logParts = [];
+
+      try {
+        multi = await loadWithMeta("../results/multilingual_results.json");
+        const m = multi.metrics || {};
+        document.getElementById("metric-gap").textContent = formatScore(m.separation_gap);
+        document.getElementById("metric-pos").textContent = formatScore(m.positive_mean);
+        document.getElementById("metric-neg").textContent = formatScore(m.negative_mean);
+
+        const pairs = Array.isArray(multi.pairs) ? multi.pairs : [];
+        state.rows = pairs.map((p) => ({
+          proposal_id: p.proposal_id,
+          language_pair: p.language_pair,
+          label: p.label,
+          similarity_score: p.similarity_score
+        }));
+        const anomalies = pairs
+          .filter((p) => p.label === "positive" && Number(p.similarity_score) < 0.85)
+          .sort((a, b) => Number(a.similarity_score) - Number(b.similarity_score))
+          .slice(0, 3);
+        renderAnomalies(anomalies);
+
+        const multiPass = Number(m.separation_gap ?? 0) >= 0.2;
+        setStatus(statusMulti, multiPass ? "PASS" : "FAIL");
+      } catch {
+        setStatus(statusMulti, "SKIP");
+        renderAnomalies([]);
+      }
+
+      try {
+        dup = await loadWithMeta("../results/duplicate_results.json");
+        const best = dup.recommended_threshold || {};
+        const dupPass = Number(best.combined_f1 ?? 0) >= 0.8;
+        setStatus(statusDup, dupPass ? "PASS" : "FAIL");
+      } catch {
+        setStatus(statusDup, "SKIP");
+      }
+
+      const mState = statusMulti.textContent;
+      const dState = statusDup.textContent;
+      const overall = (mState === "PASS" && dState === "PASS")
+        ? "PASS"
+        : (mState === "SKIP" && dState === "SKIP") ? "SKIP" : "FAIL";
+      setStatus(statusOverall, overall);
+
+      renderTable();
+      updateSortIndicators();
+
+      try {
+        const [multiLog, dupLog] = await Promise.all([
+          loadTextWithMeta("../results/multilingual_report.md").catch(() => ""),
+          loadTextWithMeta("../results/duplicate_report.md").catch(() => "")
+        ]);
+        if (multiLog) logParts.push("multilingual_report.md\n" + multiLog);
+        if (dupLog) logParts.push("duplicate_report.md\n" + dupLog);
+      } catch {}
+
+      log.textContent = logParts.length ? logParts.join("\n\n---\n\n") : "computing...";
+      logNote.textContent = logParts.length ? "Loaded from report artifacts in evaluation/results." : "No report artifacts found yet. Run evaluations to populate logs.";
+      document.getElementById("last-run").textContent = latestRunLabel();
+    })();
+
+    document.getElementById("search-input").addEventListener("input", renderTable);
+    document.querySelectorAll("th[data-sort]").forEach((th) => {
+      th.addEventListener("click", () => {
+        const key = th.getAttribute("data-sort");
+        if (state.sortKey === key) {
+          state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+        } else {
+          state.sortKey = key;
+          state.sortDir = "asc";
+        }
+        renderTable();
+        updateSortIndicators();
+      });
+    });
+  </script>
 </body>
 </html>
