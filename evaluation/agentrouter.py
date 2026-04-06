@@ -38,6 +38,8 @@ def get_completion(prompt: str, max_tokens: int = 512) -> str:
             max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}],
         )
+        if not response.content or not hasattr(response.content[0], "text"):
+            raise RuntimeError("Claude completion response missing text")
         return response.content[0].text
     except Exception as exc:
         print(f"Completion provider claude failed: {exc}")
@@ -65,7 +67,7 @@ def get_embedding(text: str) -> List[float]:
         client = OpenAI(api_key=api_key, base_url=openai_base_url)
         response = client.embeddings.create(model=model, input=text)
         if response.data:
-            return response.data[0].embedding
+            return [float(x) for x in response.data[0].embedding]
         raise RuntimeError("OpenAI embedding response contained no vectors")
     except Exception as exc:
         print(f"Embedding provider openai failed: {exc}")
