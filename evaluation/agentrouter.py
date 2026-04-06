@@ -4,7 +4,7 @@ from typing import List, Optional
 
 FALLBACK_OPENAI_BASE_URL = "https://agentrouter.org/v1"
 DEFAULT_COMPLETION_MODEL = "claude-sonnet-4-20250514"
-DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-20250514"
+DEFAULT_CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001"
 
 
@@ -34,13 +34,11 @@ def get_completion(prompt: str, max_tokens: int = 512) -> str:
 
         client = anthropic.Anthropic(**client_kwargs)
         response = client.messages.create(
-            model=(os.getenv("CLAUDE_MODEL") or os.getenv("PARAPHRASE_MODEL") or DEFAULT_CLAUDE_MODEL),
-            messages=[{"role": "user", "content": prompt}],
+            model=(os.getenv("CLAUDE_MODEL") or DEFAULT_CLAUDE_MODEL),
             max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}],
         )
-        if response.content and hasattr(response.content[0], "text"):
-            return response.content[0].text
-        raise RuntimeError("Claude completion response missing text")
+        return response.content[0].text
     except Exception as exc:
         print(f"Completion provider claude failed: {exc}")
         last_error = exc
@@ -58,10 +56,16 @@ def get_embedding(text: str) -> List[float]:
     try:
         from openai import OpenAI  # type: ignore
 
-        client = OpenAI(api_key=api_key, base_url=_get_openai_base_url())
+        anthropic_base_url = (os.getenv("ANTHROPIC_BASE_URL") or "").strip()
+        if anthropic_base_url:
+            base_root = anthropic_base_url.rstrip("/")
+            openai_base_url = base_root if base_root.endswith("/v1") else f"{base_root}/v1"
+        else:
+            openai_base_url = FALLBACK_OPENAI_BASE_URL
+        client = OpenAI(api_key=api_key, base_url=openai_base_url)
         response = client.embeddings.create(model=model, input=text)
-        if response.data and response.data[0].embedding:
-            return [float(x) for x in response.data[0].embedding]
+        if response.data:
+            return response.data[0].embedding
         raise RuntimeError("OpenAI embedding response contained no vectors")
     except Exception as exc:
         print(f"Embedding provider openai failed: {exc}")
