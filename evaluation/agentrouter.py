@@ -99,7 +99,7 @@ def get_embedding(text: str) -> List[float]:
         or ""
     ).strip()
     if not api_key:
-        raise EnvironmentError("OPENAI_API_KEY/ANTHROPIC_API_KEY not set")
+        raise EnvironmentError("OPENAI_API_KEY/ANTHROPIC_API_KEY/ANTHROPIC_AUTH_TOKEN not set")
 
     try:
         from openai import OpenAI  # type: ignore
