@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from scipy.spatial.distance import cosine
 from tabulate import tabulate
+import agentrouter
 
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
@@ -29,50 +30,7 @@ FALLBACK_OPENAI_BASE_URL = "https://agentrouter.org/v1"
 
 class EvaluationClient:
     def __init__(self):
-        self._anthropic_client = None
-        self._gemini_client = None
-        self._openai_client = None
-        self._embedding_mode = "unknown"
         self._last_paraphrase_ts = 0.0
-
-        try:
-            import anthropic  # type: ignore
-        except Exception as exc:
-            raise RuntimeError(
-                "anthropic SDK is required for Claude paraphrase generation. Install it with pip."
-            ) from exc
-        self._anthropic_client = anthropic.Anthropic()
-        gemini_key = (os.getenv("GEMINI_API_KEY") or "").strip()
-        if gemini_key:
-            try:
-                import google.generativeai as genai  # type: ignore
-
-                genai.configure(api_key=gemini_key)
-                self._gemini_client = genai
-                self._embedding_mode = "gemini"
-            except Exception as exc:
-                print(f"Falling back from google-generativeai SDK: {exc}")
-
-        if self._embedding_mode == "unknown":
-            agentrouter_bearer_token = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
-            if not agentrouter_bearer_token:
-                raise RuntimeError(
-                    "Set GEMINI_API_KEY for direct Gemini embeddings, or set ANTHROPIC_API_KEY (and install openai SDK) to route embeddings via AgentRouter OpenAI endpoint."
-                )
-            anthropic_base_url = (os.getenv("ANTHROPIC_BASE_URL") or "").strip()
-            if anthropic_base_url:
-                base_root = anthropic_base_url.rstrip("/")
-                openai_base_url = base_root if base_root.endswith("/v1") else f"{base_root}/v1"
-            else:
-                openai_base_url = FALLBACK_OPENAI_BASE_URL
-            try:
-                from openai import OpenAI  # type: ignore
-            except Exception as exc:
-                raise RuntimeError(
-                    "openai SDK is required for AgentRouter-routed embeddings when GEMINI_API_KEY is not set."
-                ) from exc
-            self._openai_client = OpenAI(api_key=agentrouter_bearer_token, base_url=openai_base_url)
-            self._embedding_mode = "agentrouter-openai"
 
     def _with_backoff(self, fn):
         backoff = INITIAL_BACKOFF
@@ -148,21 +106,7 @@ class EvaluationClient:
 
     def get_embedding(self, text: str, model: str) -> List[float]:
         def call():
-            if self._gemini_client is not None:
-                resp = self._gemini_client.embed_content(model=model, content=text)
-                emb = self._extract_embedding(resp)
-                if emb:
-                    return emb
-                raise RuntimeError(f"Unexpected Gemini embedding response shape: {resp}")
-
-            if self._openai_client is not None:
-                resp = self._openai_client.embeddings.create(model=model, input=text)
-                emb = self._extract_embedding(resp)
-                if emb:
-                    return emb
-                raise RuntimeError(f"OpenAI-compatible embedding response contained no vectors: {resp}")
-
-            raise RuntimeError("Embedding client is not configured")
+            return agentrouter.get_embedding(text)
 
         return self._with_backoff(call)
 
@@ -181,21 +125,9 @@ class EvaluationClient:
         )
 
         def call():
-            if self._anthropic_client is None:
-                raise RuntimeError("Anthropic client is not configured")
-            resp = self._anthropic_client.messages.create(
-                model=PARAPHRASE_MODEL,
-                system="You output strict JSON only.",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=1200,
-            )
-            text_content = ""
-            for block in resp.content:
-                if block.type == "text":
-                    text_content += block.text
+            text_content = agentrouter.get_completion(prompt, max_tokens=1200)
             if not text_content:
-                raise RuntimeError(f"Unexpected Anthropic response shape: {resp}")
+                raise RuntimeError("Completion returned empty text")
             return parse_json_block(text_content)
 
         result = self._with_backoff(call)
