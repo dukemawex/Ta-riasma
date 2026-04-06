@@ -16,6 +16,46 @@ def _get_openai_base_url() -> str:
     return FALLBACK_OPENAI_BASE_URL
 
 
+def _extract_claude_text(content) -> Optional[str]:
+    if content is None:
+        return None
+
+    if isinstance(content, str):
+        stripped = content.strip()
+        return stripped or None
+
+    if isinstance(content, list):
+        text_parts: List[str] = []
+        for item in content:
+            if isinstance(item, str):
+                if item.strip():
+                    text_parts.append(item.strip())
+                continue
+            text_attr = getattr(item, "text", None)
+            if isinstance(text_attr, str) and text_attr.strip():
+                text_parts.append(text_attr.strip())
+                continue
+            if isinstance(item, dict):
+                maybe_text = item.get("text")
+                if isinstance(maybe_text, str) and maybe_text.strip():
+                    text_parts.append(maybe_text.strip())
+        if text_parts:
+            return "\n".join(text_parts)
+
+    text_attr = getattr(content, "text", None)
+    if isinstance(text_attr, str):
+        stripped = text_attr.strip()
+        return stripped or None
+
+    if isinstance(content, dict):
+        maybe_text = content.get("text")
+        if isinstance(maybe_text, str):
+            stripped = maybe_text.strip()
+            return stripped or None
+
+    return None
+
+
 def get_completion(prompt: str, max_tokens: int = 512) -> str:
     last_error: Optional[Exception] = None
 
@@ -38,9 +78,10 @@ def get_completion(prompt: str, max_tokens: int = 512) -> str:
             messages=[{"role": "user", "content": prompt}],
             max_tokens=max_tokens,
         )
-        if not response.content or not hasattr(response.content[0], "text"):
+        text = _extract_claude_text(getattr(response, "content", None))
+        if not text:
             raise RuntimeError("Claude completion response missing text")
-        return response.content[0].text
+        return text
     except Exception as exc:
         print(f"Completion provider claude failed: {exc}")
         last_error = exc
@@ -51,9 +92,14 @@ def get_completion(prompt: str, max_tokens: int = 512) -> str:
 def get_embedding(text: str) -> List[float]:
     last_error: Optional[Exception] = None
     model = os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
-    api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
+    api_key = (
+        os.getenv("OPENAI_API_KEY")
+        or os.getenv("ANTHROPIC_API_KEY")
+        or os.getenv("ANTHROPIC_AUTH_TOKEN")
+        or ""
+    ).strip()
     if not api_key:
-        raise EnvironmentError("OPENAI_API_KEY not set")
+        raise EnvironmentError("OPENAI_API_KEY/ANTHROPIC_API_KEY not set")
 
     try:
         from openai import OpenAI  # type: ignore
